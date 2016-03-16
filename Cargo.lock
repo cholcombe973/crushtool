@@ -1,0 +1,18 @@
+[root]
+name = "crushtool"
+version = "0.1.0"
+dependencies = [
+ "byteorder 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "nom 1.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "byteorder"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "nom"
+version = "1.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
