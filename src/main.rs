@@ -2,12 +2,13 @@
 //
 
 #[macro_use] extern crate enum_primitive;
+#[macro_use] extern crate log;
 #[macro_use] extern crate nom;
 extern crate num;
 use num::FromPrimitive;
-//extern crate byteorder;
 
 use nom::{le_u8, le_u16, le_i32, le_u32};
+use std::collections::HashMap;
 
 static CRUSH_MAGIC: u32 = 0x00010000;  /* for detecting algorithm revisions */
 
@@ -55,6 +56,20 @@ fn test_decode_crushmap() {
     // assert_eq!(result, expected_bytes);
 }
 
+/*
+ * A bucket is a named container of other items (either devices or
+ * other buckets).  Items within a bucket are chosen using one of a
+ * few different algorithms.  The table summarizes how the speed of
+ * each option measures up against mapping stability when items are
+ * added or removed.
+ *
+ *  Bucket Alg     Speed       Additions    Removals
+ *  ------------------------------------------------
+ *  uniform         O(1)       poor         poor
+ *  list            O(n)       optimal      poor
+ *  tree            O(log n)   good         good
+ *  straw           O(n)       optimal      optimal
+ */
 enum_from_primitive!{
     #[repr(u8)]
     #[derive(Debug, Clone)]
@@ -62,7 +77,7 @@ enum_from_primitive!{
         Uniform = 1,
         List = 2,
         Tree = 3,
-        Straw = 4
+        Straw = 4,
     }
 }
 
@@ -90,6 +105,7 @@ enum_from_primitive!{
 
 #[derive(Debug)]
 struct CrushBucketUniform {
+    bucket: Bucket,
     item_weight: u32,  /* 16-bit fixed point; all items equally weighted */
 }
 
@@ -97,9 +113,11 @@ impl CrushBucketUniform{
     fn parse<'a>(input: &'a [u8]) -> nom::IResult<&[u8], Self>{
         chain!(
             input,
+            bucket: call!(Bucket::parse)~
             weight: le_u32,
             ||{
                 CrushBucketUniform{
+                    bucket: bucket,
                     item_weight: weight,
                 }
             }
@@ -109,19 +127,22 @@ impl CrushBucketUniform{
 
 #[derive(Debug)]
 struct CrushBucketList {
+    bucket: Bucket,
     item_weights: Vec<(u32, u32)>,  /* 16-bit fixed point */
     //sum_weights: u32,   /* 16-bit fixed point.  element i is sum
     //             of weights 0..i, inclusive */
 }
 impl CrushBucketList{
-    fn parse<'a>(input: &'a [u8], size: u32) -> nom::IResult<&[u8], Self>{
+    fn parse<'a>(input: &'a [u8]) -> nom::IResult<&[u8], Self>{
         chain!(
             input,
+            bucket: call!(Bucket::parse)~
             item_weights: count!(
                 pair!(le_u32, le_u32),
-                size as usize),
+                bucket.size as usize),
             ||{
                 CrushBucketList{
+                    bucket: bucket,
                     item_weights: item_weights,
                 }
             }
@@ -133,6 +154,7 @@ impl CrushBucketList{
 struct CrushBucketTree {
     /* note: h.size is _tree_ size, not number of
            actual items */
+    bucket: Bucket,
     num_nodes: u8,
     node_weights: Vec<u32>,
 }
@@ -141,10 +163,12 @@ impl CrushBucketTree{
     fn parse<'a>(input: &'a [u8]) -> nom::IResult<&[u8], Self>{
         chain!(
             input,
+            bucket: call!(Bucket::parse)~
             num_nodes: le_u8~
             node_weights: count!(le_u32, num_nodes as usize),
             ||{
                 CrushBucketTree{
+                    bucket: bucket,
                     num_nodes: num_nodes,
                     node_weights: node_weights
                 }
@@ -155,18 +179,21 @@ impl CrushBucketTree{
 
 #[derive(Debug)]
 struct CrushBucketStraw {
+    bucket: Bucket,
     item_weights: Vec<(u32, u32)>,   /* 16-bit fixed point */
     //straws: u32,         /* 16-bit fixed point */
 }
 
 impl CrushBucketStraw{
-    fn parse<'a>(input: &'a [u8], size: u32) -> nom::IResult<&[u8], Self>{
+    fn parse<'a>(input: &'a [u8]) -> nom::IResult<&[u8], Self>{
         chain!(
             input,
-            item_weights: count!(pair!(le_u32, le_u32), size as usize),
+            bucket: call!(Bucket::parse)~
+            item_weights: count!(pair!(le_u32, le_u32), bucket.size as usize),
             //straws: le_u32,
             ||{
                 CrushBucketStraw{
+                    bucket: bucket,
                     item_weights: item_weights,
                     //straws: straws,
                 }
@@ -177,51 +204,131 @@ impl CrushBucketStraw{
 
 #[derive(Debug)]
 enum BucketTypes{
-    uniform(CrushBucketUniform),
-    list(CrushBucketList),
-    tree(CrushBucketTree),
-    straw(CrushBucketStraw),
+    Uniform(CrushBucketUniform),
+    List(CrushBucketList),
+    Tree(CrushBucketTree),
+    Straw(CrushBucketStraw),
+    Unknown
 }
 
-fn parse_bucket<'a>(input: &'a [u8], algorithm: BucketAlg, size: u32) -> nom::IResult<&[u8], BucketTypes>{
-    match algorithm{
-        BucketAlg::Uniform =>{
-            chain!(
-                input,
-                uniform_bucket: dbg!(call!(CrushBucketUniform::parse)),
-                ||{
-                    BucketTypes::uniform(uniform_bucket)
-                }
-            )
+fn parse_string<'a>(i: &'a [u8]) -> nom::IResult<&[u8], String> {
+    chain!(i,
+        length: le_u32 ~
+        s: take_str!(length),
+        ||{
+            s.to_string()
+        }
+    )
+}
+
+fn parse_string_map<'a>(input: &'a [u8])->nom::IResult<&[u8], HashMap<i32,String>>{
+    let string_map = HashMap::new();
+    let n_bits = le_u32(input);
+    match n_bits{
+        nom::IResult::Done(unparsed_data, n) =>{
+            println!("n bits: {}", n);
+            for _ in 0..n{
+                let hash_map_result = pair!(unparsed_data, le_i32, call!(parse_string));
+            }
+            return nom::IResult::Done(unparsed_data, string_map);
         },
-        BucketAlg::List => {
-            chain!(
-                input,
-                list_bucket: dbg!(call!(CrushBucketList::parse, size)),
-                ||{
-                    BucketTypes::list(list_bucket)
-                }
-            )
-        },
-        BucketAlg::Tree => {
-            chain!(
-                input,
-                tree_bucket: dbg!(call!(CrushBucketTree::parse)),
-                ||{
-                    BucketTypes::tree(tree_bucket)
-                }
-            )
-        },
-        BucketAlg::Straw => {
-            chain!(
-                input,
-                straw_bucket: dbg!(call!(CrushBucketStraw::parse, size)),
-                ||{
-                    BucketTypes::straw(straw_bucket)
-                }
-            )
+        nom::IResult::Incomplete(needed) => {
+            return nom::IResult::Incomplete(needed);
+        }
+        nom::IResult::Error(e) => {
+            return nom::IResult::Error(e);
         },
     }
+}
+
+
+fn parse_bucket<'a>(input: &'a [u8]) -> nom::IResult<&[u8], BucketTypes>{
+    let alg_type_bits = le_u32(input);
+    match alg_type_bits{
+        nom::IResult::Done(unparsed_data, alg_bits) =>{
+            let some_alg = BucketAlg::from_u32(alg_bits);
+            let alg = match some_alg{
+                Some(t) => t,
+                None => {
+                    return nom::IResult::Done(unparsed_data, BucketTypes::Unknown);
+                }
+            };
+            match alg{
+                BucketAlg::Uniform =>{
+                trace!("Trying to decode uniform bucket");
+                    chain!(
+                        input,
+                        uniform_bucket: dbg!(call!(CrushBucketUniform::parse)),
+                        ||{
+                            BucketTypes::Uniform(uniform_bucket)
+                        }
+                    )
+                },
+                BucketAlg::List => {
+                trace!("Trying to decode list bucket");
+                    chain!(
+                        input,
+                        list_bucket: dbg!(call!(CrushBucketList::parse)),
+                        ||{
+                            BucketTypes::List(list_bucket)
+                        }
+                    )
+                },
+                BucketAlg::Tree => {
+                trace!("Trying to decode tree bucket");
+                    chain!(
+                        input,
+                        tree_bucket: dbg!(call!(CrushBucketTree::parse)),
+                        ||{
+                            BucketTypes::Tree(tree_bucket)
+                        }
+                    )
+                },
+                BucketAlg::Straw => {
+                trace!("Trying to decode straw bucket");
+                    chain!(
+                        input,
+                        straw_bucket: dbg!(call!(CrushBucketStraw::parse)),
+                        ||{
+                            BucketTypes::Straw(straw_bucket)
+                        }
+                    )
+                },
+            }
+        }
+        nom::IResult::Incomplete(needed) => {
+            return nom::IResult::Incomplete(needed);
+        }
+        nom::IResult::Error(e) => {
+            return nom::IResult::Error(e);
+        },
+    }
+}
+
+fn parse_rules<'a>(input: &'a [u8], num_of_rules: u32) ->nom::IResult<&[u8], Vec<Option<Rule>>>{
+    let mut rules: Vec<Option<Rule>> = Vec::with_capacity(num_of_rules as usize);
+    for _ in 0..num_of_rules{
+    let yes = try_parse!(input, le_u32);
+        if yes.1 == 0{
+            rules.push(None);
+            continue;
+        }
+        else{
+            let rule = Rule::parse(yes.0);
+            match rule{
+                nom::IResult::Done(unparsed_data, decoded_rule) =>{
+                    rules.push(Some(decoded_rule));
+                },
+                nom::IResult::Incomplete(needed) => {
+                    return nom::IResult::Incomplete(needed);
+                }
+                nom::IResult::Error(e) => {
+                    return nom::IResult::Error(e);
+                },
+            }
+        }
+    }
+    return nom::IResult::Done(input, rules);
 }
 
 #[derive(Debug)]
@@ -233,7 +340,6 @@ struct Bucket{
     weight: u32,      /* 16-bit fixed point */
     size: u32,        /* num items */
     items: Vec<i32>,
-    buckets: BucketTypes,
     /*
      * cached random permutation: used for uniform bucket and for
      * the linear search fallback for the other bucket types.
@@ -245,7 +351,7 @@ struct Bucket{
 
 impl Bucket{
     fn parse<'a>(input: &'a [u8]) -> nom::IResult<&[u8], Self>{
-        //println!("bucket input: {:?}", input);
+        //trace!("bucket input: {:?}", input);
         chain!(
             input,
             struct_size: le_u32~
@@ -258,8 +364,7 @@ impl Bucket{
             hash: le_u8~
             weight: le_u32~
             size: le_u32~
-            items: dbg!(count!(le_i32, size as usize))~
-            buckets: dbg!(call!(parse_bucket, alg.clone(), size)),
+            items: dbg!(count!(le_i32, size as usize)),
             ||{
                 Bucket{
                     id: id,
@@ -268,7 +373,6 @@ impl Bucket{
                     hash: hash,
                     weight: weight,
                     size: size,
-                    buckets: buckets,
                     perm_n: 0,
                     perm: size,
                     items: items,
@@ -278,6 +382,11 @@ impl Bucket{
     }
 }
 
+/*
+ * CRUSH uses user-defined "rules" to describe how inputs should be
+ * mapped to devices.  A rule consists of sequence of steps to perform
+ * to generate the set of output devices.
+ */
 #[derive(Debug)]
 struct CrushRuleStep {
     op: u32,
@@ -287,7 +396,7 @@ struct CrushRuleStep {
 
 impl CrushRuleStep{
     fn parse<'a>(input: &'a [u8]) -> nom::IResult<&[u8], Self>{
-        println!("rule step input: {:?}", input);
+        trace!("rule step input: {:?}", input);
         chain!(
             input,
             op: le_u32~
@@ -304,6 +413,11 @@ impl CrushRuleStep{
     }
 }
 
+/*
+ * The rule mask is used to describe what the rule is intended for.
+ * Given a ruleset and size of output set, we search through the
+ * rule list for a matching rule_mask.
+ */
 #[derive(Debug)]
 struct CrushRuleMask {
     ruleset: u8,
@@ -314,7 +428,7 @@ struct CrushRuleMask {
 
 impl CrushRuleMask{
     fn parse<'a>(input: &'a [u8]) -> nom::IResult<&[u8], Self>{
-        println!("rule mask input: {:?}", input);
+        trace!("rule mask input: {:?}", input);
         chain!(
             input,
             ruleset: le_u8~
@@ -337,17 +451,17 @@ impl CrushRuleMask{
 struct Rule{
     len: u32,
     mask: CrushRuleMask,
-    steps: CrushRuleStep,
+    steps: Vec<CrushRuleStep>,
 }
 
 impl Rule{
     fn parse<'a>(input: &'a [u8]) -> nom::IResult<&[u8], Self>{
-        println!("rule input: {:?}", input);
+        trace!("rule input: {:?}", input);
         chain!(
             input,
             length: le_u32~
             mask: dbg!(call!(CrushRuleMask::parse))~
-            steps: dbg!(call!(CrushRuleStep::parse)),
+            steps: dbg!(count!(call!(CrushRuleStep::parse), length as usize)),
             ||{
                 Rule{
                     len: length,
@@ -366,9 +480,12 @@ struct CrushMap {
     max_rules: u32,
     max_devices: i32,
 
-    buckets: Vec<Bucket>,
-    /*
+    buckets: Vec<BucketTypes>,
     rules: Vec<Rule>,
+
+    type_map: HashMap<i32, String>,
+    name_map: HashMap<i32, String>,
+    rule_name_map: HashMap<i32, String>,
 
     /* choose local retries before re-descent */
     choose_local_tries: u32,
@@ -387,18 +504,13 @@ struct CrushMap {
      * bits.  a value of 1 is best for new clusters.  for legacy clusters
      * that want to limit reshuffling, a value of 3 or 4 will make the
      * mappings line up a bit better with previous mappings. */
-    chooseleaf_vary_r: u8,bucket input: [0, 0, 0, 255, 255, 255, 10, 0, 4, 0, 0, 0, 0, 0, 3, 0, 0, 0, 254, 255, 255, 253, 255, 255, 255, 252, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 254, 255, 255, 255, 1, 0, 4, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 253, 255, 255, 255, 1, 0, 4, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 252, 255, 255, 255, 1, 0, 4, 0, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 3, 0, 0, 0, 0, 1, 1, 10, 1, 0, 0, 255, 255, 255, 255, 0, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 111, 115, 100, 0, 0, 0, 4, 0, 0, 0, 104, 111, 115, 116, 2, 0, 0, 0, 0, 0, 0, 99, 104, 97, 115, 115, 105, 115, 3, 0, 0, 0, 4, 0, 0, 114, 97, 99, 107, 4, 0, 0, 0, 3, 0, 0, 0, 114, 119, 5, 0, 0, 0, 3, 0, 0, 0, 112, 100, 117, 6, 0, 0, 3, 0, 0, 0, 112, 111, 100, 7, 0, 0, 0, 4, 0, 0, 0, 111, 111, 109, 8, 0, 0, 0, 10, 0, 0, 0, 100, 97, 116, 97, 101, 110, 116, 101, 114, 9, 0, 0, 0, 6, 0, 0, 0, 114, 101, 105, 111, 110, 10, 0, 0, 0, 4, 0, 0, 0, 114, 111, 111, 116, 0, 0, 0, 252, 255, 255, 255, 14, 0, 0, 0, 105, 112, 45, 49, 50, 45, 51, 49, 45, 52, 45, 53, 54, 253, 255, 255, 255, 14, 0, 0, 105, 112, 45, 49, 55, 50, 45, 51, 49, 45, 50, 50, 45, 50, 255, 255, 255, 16, 0, 0, 0, 105, 112, 45, 49, 55, 50, 45, 51, 45, 52, 51, 45, 49, 52, 55, 255, 255, 255, 255, 7, 0, 0, 0, 101, 102, 97, 117, 108, 116, 0, 0, 0, 0, 5, 0, 0, 0, 111, 100, 46, 48, 1, 0, 0, 0, 5, 0, 0, 0, 111, 115, 100, 46, 2, 0, 0, 0, 5, 0, 0, 0, 111, 115, 100, 46, 50, 1, 0, 0, 0, 0, 0, 0, 18, 0, 0, 0, 114, 101, 112, 108, 105, 99, 116, 101, 100, 95, 114, 117, 108, 101, 115, 101, 116, 0, 0, 0, 0, 0, 0, 0, 50, 0, 0, 0, 1, 0, 0, 0, 0, 1]
- has various flaws.  version 1
-     * fixes a few of them.
-     */
-     /*
+    chooseleaf_vary_r: u8,
     straw_calc_version: u8,
     choose_tries: u32,
-    */
 }
 
 fn parse_crushmap<'a>(input: &'a [u8]) -> nom::IResult<&[u8], CrushMap>{
-    println!("crushmap input: {:?}", input);
+    trace!("crushmap input: {:?}", input);
     chain!(
         input,
         //preamble
@@ -409,15 +521,18 @@ fn parse_crushmap<'a>(input: &'a [u8]) -> nom::IResult<&[u8], CrushMap>{
         max_devices: le_i32 ~
 
         buckets: dbg!(count!(
-            call!(Bucket::parse),
-            4
-            //max_buckets as usize
-        )),
-        /*
+            call!(parse_bucket),
+            max_buckets as usize
+        ))~
         rules: dbg!(count!(
             call!(Rule::parse),
             max_rules as usize
         ))~
+        //rules: dbg!(call!(parse_rules, max_rules))~
+        type_map: call!(parse_string_map)~
+        name_map: call!(parse_string_map)~
+        rule_name_map: call!(parse_string_map)~
+
         //Tunables
         choose_local_tries: le_u32 ~
         choose_local_fallback_tries: le_u32 ~
@@ -426,7 +541,6 @@ fn parse_crushmap<'a>(input: &'a [u8]) -> nom::IResult<&[u8], CrushMap>{
         chooseleaf_vary_r: le_u8 ~
         straw_calc_version: le_u8 ~
         choose_tries: le_u32 ,
-        */
         || {
             CrushMap{
                 magic: crush_magic,
@@ -435,8 +549,10 @@ fn parse_crushmap<'a>(input: &'a [u8]) -> nom::IResult<&[u8], CrushMap>{
                 max_devices: max_devices,
 
                 buckets: buckets,
-                /*
                 rules: rules,
+                type_map: type_map,
+                name_map: name_map,
+                rule_name_map: rule_name_map,
 
                 choose_local_tries: choose_local_tries,
                 choose_local_fallback_tries: choose_local_fallback_tries,
@@ -445,7 +561,6 @@ fn parse_crushmap<'a>(input: &'a [u8]) -> nom::IResult<&[u8], CrushMap>{
                 chooseleaf_vary_r: chooseleaf_vary_r,
                 straw_calc_version: straw_calc_version,
                 choose_tries: choose_tries,
-                */
             }
         }
     )

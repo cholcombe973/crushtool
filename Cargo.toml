@@ -4,7 +4,9 @@ version = "0.1.0"
 authors = ["Chris Holcombe <xfactor973@gmail.com>"]
 
 [dependencies]
-byteorder = "*"
+# byteorder = "*"
 enum_primitive = "*"
+log = "*"
 nom = "*"
 num = "*"
+simple_logger = "*"
