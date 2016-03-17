@@ -5,4 +5,6 @@ authors = ["Chris Holcombe <xfactor973@gmail.com>"]
 
 [dependencies]
 byteorder = "*"
+enum_primitive = "*"
 nom = "*"
+num = "*"
