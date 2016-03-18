@@ -8,7 +8,6 @@ extern crate num;
 use num::FromPrimitive;
 
 use nom::{le_u8, le_u16, le_i32, le_u32};
-use std::collections::HashMap;
 
 static CRUSH_MAGIC: u32 = 0x00010000;  /* for detecting algorithm revisions */
 
@@ -211,38 +210,44 @@ enum BucketTypes{
     Unknown
 }
 
-fn parse_string<'a>(i: &'a [u8]) -> nom::IResult<&[u8], String> {
+named!(decode_32_or_64<&[u8], u32>,
+    chain!(
+        a: le_u32~
+        //if a ==0 take another u32
+        b: cond!(a==0, le_u32),
+        ||{
+            b.unwrap_or(a)
+        }
+    )
+);
+
+fn parse_string(i: & [u8]) -> nom::IResult<&[u8], String> {
+    trace!("parse_string input: {:?}", i);
     chain!(i,
-        length: le_u32 ~
-        s: take_str!(length),
+        length: decode_32_or_64 ~
+        s: dbg!(take_str!(length)),
         ||{
             s.to_string()
         }
     )
 }
 
-fn parse_string_map<'a>(input: &'a [u8])->nom::IResult<&[u8], HashMap<i32,String>>{
-    let string_map = HashMap::new();
-    let n_bits = le_u32(input);
-    match n_bits{
-        nom::IResult::Done(unparsed_data, n) =>{
-            println!("n bits: {}", n);
-            for _ in 0..n{
-                let hash_map_result = pair!(unparsed_data, le_i32, call!(parse_string));
-            }
-            return nom::IResult::Done(unparsed_data, string_map);
-        },
-        nom::IResult::Incomplete(needed) => {
-            return nom::IResult::Incomplete(needed);
+fn parse_string_map(input: & [u8])->nom::IResult<&[u8], Vec<(i32,String)>>{
+    trace!("parse_string_map input: {:?}", input);
+    chain!(input,
+        count: le_u32~
+        string_map: dbg!(
+            count!(
+                pair!(le_i32,
+                    dbg!(call!(parse_string))), count as usize)),
+        ||{
+            string_map
         }
-        nom::IResult::Error(e) => {
-            return nom::IResult::Error(e);
-        },
-    }
+    )
 }
 
-
 fn parse_bucket<'a>(input: &'a [u8]) -> nom::IResult<&[u8], BucketTypes>{
+    trace!("parse_bucket input: {:?}", input);
     let alg_type_bits = le_u32(input);
     match alg_type_bits{
         nom::IResult::Done(unparsed_data, alg_bits) =>{
@@ -250,6 +255,7 @@ fn parse_bucket<'a>(input: &'a [u8]) -> nom::IResult<&[u8], BucketTypes>{
             let alg = match some_alg{
                 Some(t) => t,
                 None => {
+                    trace!("Unknown bucket: {:?}", alg_bits);
                     return nom::IResult::Done(unparsed_data, BucketTypes::Unknown);
                 }
             };
@@ -305,32 +311,6 @@ fn parse_bucket<'a>(input: &'a [u8]) -> nom::IResult<&[u8], BucketTypes>{
     }
 }
 
-fn parse_rules<'a>(input: &'a [u8], num_of_rules: u32) ->nom::IResult<&[u8], Vec<Option<Rule>>>{
-    let mut rules: Vec<Option<Rule>> = Vec::with_capacity(num_of_rules as usize);
-    for _ in 0..num_of_rules{
-    let yes = try_parse!(input, le_u32);
-        if yes.1 == 0{
-            rules.push(None);
-            continue;
-        }
-        else{
-            let rule = Rule::parse(yes.0);
-            match rule{
-                nom::IResult::Done(unparsed_data, decoded_rule) =>{
-                    rules.push(Some(decoded_rule));
-                },
-                nom::IResult::Incomplete(needed) => {
-                    return nom::IResult::Incomplete(needed);
-                }
-                nom::IResult::Error(e) => {
-                    return nom::IResult::Error(e);
-                },
-            }
-        }
-    }
-    return nom::IResult::Done(input, rules);
-}
-
 #[derive(Debug)]
 struct Bucket{
     id: i32,          /* this'll be negative */
@@ -351,7 +331,7 @@ struct Bucket{
 
 impl Bucket{
     fn parse<'a>(input: &'a [u8]) -> nom::IResult<&[u8], Self>{
-        //trace!("bucket input: {:?}", input);
+        trace!("bucket input: {:?}", input);
         chain!(
             input,
             struct_size: le_u32~
@@ -455,21 +435,36 @@ struct Rule{
 }
 
 impl Rule{
-    fn parse<'a>(input: &'a [u8]) -> nom::IResult<&[u8], Self>{
+    fn parse<'a>(input: &'a [u8]) -> nom::IResult<&[u8], Option<Self>>{
         trace!("rule input: {:?}", input);
-        chain!(
-            input,
-            length: le_u32~
-            mask: dbg!(call!(CrushRuleMask::parse))~
-            steps: dbg!(count!(call!(CrushRuleStep::parse), length as usize)),
-            ||{
-                Rule{
-                    len: length,
-                    mask: mask,
-                    steps: steps,
+        let yes_bits = le_u32(input);
+        match yes_bits{
+            nom::IResult::Done(unparsed_data, yes) =>{
+                if yes == 0{
+                    return nom::IResult::Done(unparsed_data, None)
+                }else{
+                    chain!(
+                        unparsed_data,
+                        length: le_u32~
+                        mask: dbg!(call!(CrushRuleMask::parse))~
+                        steps: dbg!(count!(call!(CrushRuleStep::parse), length as usize)),
+                        ||{
+                            Some(Rule{
+                                len: length,
+                                mask: mask,
+                                steps: steps,
+                            })
+                        }
+                    )
                 }
+            },
+            nom::IResult::Incomplete(needed) => {
+                return nom::IResult::Incomplete(needed);
             }
-        )
+            nom::IResult::Error(e) => {
+                return nom::IResult::Error(e);
+            },
+        }
     }
 }
 
@@ -481,13 +476,14 @@ struct CrushMap {
     max_devices: i32,
 
     buckets: Vec<BucketTypes>,
-    rules: Vec<Rule>,
+    rules: Vec<Option<Rule>>,
 
-    type_map: HashMap<i32, String>,
-    name_map: HashMap<i32, String>,
-    rule_name_map: HashMap<i32, String>,
+    type_map: Vec<(i32, String)>,
+    name_map: Vec<(i32, String)>,
+    rule_name_map: Vec<(i32, String)>,
 
     /* choose local retries before re-descent */
+    /*
     choose_local_tries: u32,
     /* choose local attempts using a fallback permutation before
      * re-descent */
@@ -507,6 +503,7 @@ struct CrushMap {
     chooseleaf_vary_r: u8,
     straw_calc_version: u8,
     choose_tries: u32,
+    */
 }
 
 fn parse_crushmap<'a>(input: &'a [u8]) -> nom::IResult<&[u8], CrushMap>{
@@ -528,12 +525,12 @@ fn parse_crushmap<'a>(input: &'a [u8]) -> nom::IResult<&[u8], CrushMap>{
             call!(Rule::parse),
             max_rules as usize
         ))~
-        //rules: dbg!(call!(parse_rules, max_rules))~
         type_map: call!(parse_string_map)~
         name_map: call!(parse_string_map)~
-        rule_name_map: call!(parse_string_map)~
+        rule_name_map: call!(parse_string_map),
 
         //Tunables
+        /*
         choose_local_tries: le_u32 ~
         choose_local_fallback_tries: le_u32 ~
         choose_total_tries: le_u32 ~
@@ -541,6 +538,7 @@ fn parse_crushmap<'a>(input: &'a [u8]) -> nom::IResult<&[u8], CrushMap>{
         chooseleaf_vary_r: le_u8 ~
         straw_calc_version: le_u8 ~
         choose_tries: le_u32 ,
+        */
         || {
             CrushMap{
                 magic: crush_magic,
@@ -554,6 +552,7 @@ fn parse_crushmap<'a>(input: &'a [u8]) -> nom::IResult<&[u8], CrushMap>{
                 name_map: name_map,
                 rule_name_map: rule_name_map,
 
+                /*
                 choose_local_tries: choose_local_tries,
                 choose_local_fallback_tries: choose_local_fallback_tries,
                 choose_total_tries: choose_total_tries,
@@ -561,6 +560,7 @@ fn parse_crushmap<'a>(input: &'a [u8]) -> nom::IResult<&[u8], CrushMap>{
                 chooseleaf_vary_r: chooseleaf_vary_r,
                 straw_calc_version: straw_calc_version,
                 choose_tries: choose_tries,
+                */
             }
         }
     )
