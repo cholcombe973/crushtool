@@ -50,10 +50,100 @@ fn test_decode_crushmap() {
         0x73, 0x65, 0x74, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00, 0x01,
         0x00, 0x00, 0x00, 0x00, 0x01,
     ];
+    let expected_result = CrushMap{
+        magic: 65536,
+        max_buckets: 8,
+        max_rules: 1,
+        max_devices: 3,
+        buckets: vec![
+            BucketTypes::Straw(
+                CrushBucketStraw {
+                    bucket: Bucket {
+                        id: -1,
+                        bucket_type: OpCode::SetChooseLocalTries,
+                        alg: BucketAlg::Straw,
+                        hash: 0,
+                        weight: 0,
+                        size: 3,
+                        items: vec![-2, -3, -4],
+                        perm_n: 0,
+                        perm: 3
+                    },
+                    item_weights: vec![(0, 0), (0, 0), (0, 0)] }),
+            BucketTypes::Straw(CrushBucketStraw {
+                bucket: Bucket { id: -2, bucket_type: OpCode::Take, alg: BucketAlg::Straw, hash: 0, weight: 0, size: 1, items: vec![0], perm_n: 0, perm: 1 }, item_weights: vec![(0, 0)] }),
+            BucketTypes::Straw(CrushBucketStraw {
+                bucket: Bucket { id: -3, bucket_type: OpCode::Take, alg: BucketAlg::Straw, hash: 0, weight: 0, size: 1, items: vec![1], perm_n: 0, perm: 1 }, item_weights: vec![(0, 0)] }),
+            BucketTypes::Straw(CrushBucketStraw {
+                bucket: Bucket { id: -4, bucket_type: OpCode::Take, alg: BucketAlg::Straw, hash: 0, weight: 0, size: 1, items: vec![2], perm_n: 0, perm: 1 }, item_weights: vec![(0, 0)] }),
+            BucketTypes::Unknown, BucketTypes::Unknown, BucketTypes::Unknown, BucketTypes::Unknown],
+        rules: vec![
+            Some(
+                Rule {
+                    len: 3,
+                    mask: CrushRuleMask {
+                        ruleset: 0,
+                        rule_type: 1,
+                        min_size: 1,
+                        max_size: 10 },
+                    steps: vec![
+                        CrushRuleStep {
+                            op: 1,
+                            arg1: -1,
+                            arg2: 0 },
+                        CrushRuleStep { op: 6, arg1: 0, arg2: 1 },
+                        CrushRuleStep { op: 4, arg1: 0, arg2: 0 }] })],
+        type_map: vec![ (0, "osd".to_string()),
+                        (1, "host".to_string()),
+                        (2, "chassis".to_string()),
+                        (3, "rack".to_string()),
+                        (4, "row".to_string()),
+                        (5, "pdu".to_string()),
+                        (6, "pod".to_string()),
+                        (7, "room".to_string()),
+                        (8, "datacenter".to_string()),
+                        (9, "region".to_string()),
+                        (10, "root".to_string())],
+        name_map: vec![
+            (-4, "ip-172-31-4-56".to_string()),
+            (-3, "ip-172-31-22-2".to_string()),
+            (-2, "ip-172-31-43-147".to_string()),
+            (-1, "default".to_string()),
+            (0, "osd.0".to_string()),
+            (1, "osd.1".to_string()),
+            (2, "osd.2".to_string())],
+        rule_name_map: vec![(0, "replicated_ruleset".to_string())],
+        choose_local_tries: Some(0),
+        choose_local_fallback_tries: Some(0),
+        choose_total_tries: Some(50),
+        chooseleaf_descend_once: Some(1),
+        chooseleaf_vary_r: Some(0),
+        straw_calc_version: Some(1),
+        choose_tries: None
+    };
     let result = parse_crushmap(&crushmap_compiled);
     println!("crushmap {:?}", result);
-    // assert_eq!(result, expected_bytes);
+    let x: &[u8] = &[];
+    assert_eq!(nom::IResult::Done(x, expected_result), result);
 }
+
+/*
+//TODO: Set default tunables to optimal
+fn set_tunables_firefly<'a>(input: &'a mut CrushMap) ->&'a mut CrushMap{
+  input.choose_local_tries = Some(0);
+  input.choose_local_fallback_tries = Some(0);
+  input.choose_total_tries = Some(50);
+  input.chooseleaf_descend_once = Some(1);
+  input.chooseleaf_vary_r = Some(1);
+  input
+}
+
+fn set_tunables_optimal<'a>(input: &'a mut CrushMap) ->&'a mut CrushMap{
+  let input = set_tunables_firefly(input);
+  input.straw_calc_version = Some(1);
+  input
+}
+*/
 
 /*
  * A bucket is a named container of other items (either devices or
@@ -71,7 +161,7 @@ fn test_decode_crushmap() {
  */
 enum_from_primitive!{
     #[repr(u8)]
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, Eq, PartialEq)]
     enum BucketAlg{
         Uniform = 1,
         List = 2,
@@ -83,7 +173,7 @@ enum_from_primitive!{
 /* step op codes */
 enum_from_primitive!{
     #[repr(u16)]
-    #[derive(Debug)]
+    #[derive(Debug, Eq, PartialEq)]
     enum OpCode{
         Noop = 0,
         Take = 1,          /* arg1 = value to start with */
@@ -102,7 +192,7 @@ enum_from_primitive!{
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 struct CrushBucketUniform {
     bucket: Bucket,
     item_weight: u32,  /* 16-bit fixed point; all items equally weighted */
@@ -124,7 +214,7 @@ impl CrushBucketUniform{
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 struct CrushBucketList {
     bucket: Bucket,
     item_weights: Vec<(u32, u32)>,  /* 16-bit fixed point */
@@ -149,7 +239,7 @@ impl CrushBucketList{
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 struct CrushBucketTree {
     /* note: h.size is _tree_ size, not number of
            actual items */
@@ -176,7 +266,7 @@ impl CrushBucketTree{
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 struct CrushBucketStraw {
     bucket: Bucket,
     item_weights: Vec<(u32, u32)>,   /* 16-bit fixed point */
@@ -201,7 +291,7 @@ impl CrushBucketStraw{
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 enum BucketTypes{
     Uniform(CrushBucketUniform),
     List(CrushBucketList),
@@ -220,6 +310,32 @@ named!(decode_32_or_64<&[u8], u32>,
         }
     )
 );
+
+fn try_le_u8(input: &[u8]) ->nom::IResult<&[u8], Option<u8>>{
+    if input.len() == 0{
+        nom::IResult::Done(input, None)
+    }else{
+        chain!(input,
+            a: le_u8,
+            ||{
+                Some(a)
+            }
+        )
+    }
+}
+
+fn try_le_u32(input: &[u8]) ->nom::IResult<&[u8], Option<u32>>{
+    if input.len() < 5{
+        nom::IResult::Done(input, None)
+    }else{
+        chain!(input,
+            a: le_u32,
+            ||{
+                Some(a)
+            }
+        )
+    }
+}
 
 fn parse_string(i: & [u8]) -> nom::IResult<&[u8], String> {
     trace!("parse_string input: {:?}", i);
@@ -311,7 +427,7 @@ fn parse_bucket<'a>(input: &'a [u8]) -> nom::IResult<&[u8], BucketTypes>{
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 struct Bucket{
     id: i32,          /* this'll be negative */
     bucket_type: OpCode, /* non-zero; type=0 is reserved for devices */
@@ -367,7 +483,7 @@ impl Bucket{
  * mapped to devices.  A rule consists of sequence of steps to perform
  * to generate the set of output devices.
  */
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 struct CrushRuleStep {
     op: u32,
     arg1: i32,
@@ -398,7 +514,7 @@ impl CrushRuleStep{
  * Given a ruleset and size of output set, we search through the
  * rule list for a matching rule_mask.
  */
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 struct CrushRuleMask {
     ruleset: u8,
     rule_type: u8,
@@ -427,7 +543,7 @@ impl CrushRuleMask{
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 struct Rule{
     len: u32,
     mask: CrushRuleMask,
@@ -468,7 +584,7 @@ impl Rule{
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 struct CrushMap {
     magic: u32,
     max_buckets: i32,
@@ -483,27 +599,25 @@ struct CrushMap {
     rule_name_map: Vec<(i32, String)>,
 
     /* choose local retries before re-descent */
-    /*
-    choose_local_tries: u32,
+    choose_local_tries: Option<u32>,
     /* choose local attempts using a fallback permutation before
      * re-descent */
-    choose_local_fallback_tries: u32,
+    choose_local_fallback_tries: Option<u32>,
     /* choose attempts before giving up */
-    choose_total_tries: u32,
+    choose_total_tries: Option<u32>,
     /* attempt chooseleaf inner descent once for firstn mode; on
      * reject retry outer descent.  Note that this does *not*
      * apply to a collision: in that case we will retry as we used
      * to. */
-    chooseleaf_descend_once: u32,
+    chooseleaf_descend_once: Option<u32>,
 
     /* if non-zero, feed r into chooseleaf, bit-shifted right by (r-1)
      * bits.  a value of 1 is best for new clusters.  for legacy clusters
      * that want to limit reshuffling, a value of 3 or 4 will make the
      * mappings line up a bit better with previous mappings. */
-    chooseleaf_vary_r: u8,
-    straw_calc_version: u8,
-    choose_tries: u32,
-    */
+    chooseleaf_vary_r: Option<u8>,
+    straw_calc_version: Option<u8>,
+    choose_tries: Option<u32>,
 }
 
 fn parse_crushmap<'a>(input: &'a [u8]) -> nom::IResult<&[u8], CrushMap>{
@@ -527,18 +641,16 @@ fn parse_crushmap<'a>(input: &'a [u8]) -> nom::IResult<&[u8], CrushMap>{
         ))~
         type_map: call!(parse_string_map)~
         name_map: call!(parse_string_map)~
-        rule_name_map: call!(parse_string_map),
+        rule_name_map: call!(parse_string_map)~
 
         //Tunables
-        /*
-        choose_local_tries: le_u32 ~
-        choose_local_fallback_tries: le_u32 ~
-        choose_total_tries: le_u32 ~
-        chooseleaf_descend_once: le_u32 ~
-        chooseleaf_vary_r: le_u8 ~
-        straw_calc_version: le_u8 ~
-        choose_tries: le_u32 ,
-        */
+        choose_local_tries: call!(try_le_u32)~
+        choose_local_fallback_tries: call!(try_le_u32)~
+        choose_total_tries: call!(try_le_u32)~
+        chooseleaf_descend_once: call!(try_le_u32) ~
+        chooseleaf_vary_r: call!(try_le_u8) ~
+        straw_calc_version: call!(try_le_u8) ~
+        choose_tries: call!(try_le_u32) ,
         || {
             CrushMap{
                 magic: crush_magic,
@@ -552,7 +664,6 @@ fn parse_crushmap<'a>(input: &'a [u8]) -> nom::IResult<&[u8], CrushMap>{
                 name_map: name_map,
                 rule_name_map: rule_name_map,
 
-                /*
                 choose_local_tries: choose_local_tries,
                 choose_local_fallback_tries: choose_local_fallback_tries,
                 choose_total_tries: choose_total_tries,
@@ -560,7 +671,6 @@ fn parse_crushmap<'a>(input: &'a [u8]) -> nom::IResult<&[u8], CrushMap>{
                 chooseleaf_vary_r: chooseleaf_vary_r,
                 straw_calc_version: straw_calc_version,
                 choose_tries: choose_tries,
-                */
             }
         }
     )
