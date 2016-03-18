@@ -5,8 +5,11 @@
 #[macro_use] extern crate log;
 #[macro_use] extern crate nom;
 extern crate num;
-use num::FromPrimitive;
+extern crate simple_logger;
 
+use std::io::{self, Read};
+
+use num::FromPrimitive;
 use nom::{le_u8, le_u16, le_i32, le_u32};
 
 static CRUSH_MAGIC: u32 = 0x00010000;  /* for detecting algorithm revisions */
@@ -567,6 +570,15 @@ fn parse_crushmap<'a>(input: &'a [u8]) -> nom::IResult<&[u8], CrushMap>{
 }
 
 fn main() {
-    let input: &[u8] = &[];
-    parse_crushmap(&input);
+    // simple_logger::init_with_level(log::LogLevel::Trace).unwrap();
+    simple_logger::init_with_level(log::LogLevel::Warn).unwrap();
+    let mut buffer: Vec<u8> = vec![];
+    match io::stdin().read_to_end(&mut buffer) {
+        Ok(_) => trace!("Read input from STDIN"),
+        Err(e) => trace!("Failed to read STDIN: {:?}", e)
+    };
+
+    let input: &[u8] = &buffer.as_slice();
+    let result = parse_crushmap(&input);
+    println!("crushmap {:?}", result);
 }
