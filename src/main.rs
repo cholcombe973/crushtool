@@ -579,6 +579,12 @@ fn main() {
     };
 
     let input: &[u8] = &buffer.as_slice();
-    let result = parse_crushmap(&input);
-    println!("crushmap {:?}", result);
+    let result: CrushMap = match parse_crushmap(&input){
+        nom::IResult::Done(_, r) => r,
+        _ => panic!("There was a problem parsing the crushmap"),
+    };
+    if result.magic != CRUSH_MAGIC {
+        panic!("Could not decompile crushmap");
+    }
+    println!("{:?}", result);
 }
