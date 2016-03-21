@@ -1,14 +1,16 @@
 //Decompile a ceph crushmap for fun and profit
 //
-
+extern crate byteorder;
 #[macro_use] extern crate enum_primitive;
 #[macro_use] extern crate log;
 #[macro_use] extern crate nom;
 extern crate num;
 extern crate simple_logger;
 
-use std::io::{self, Read};
+use std::io::{self, ErrorKind, Read};
+use std::string::FromUtf8Error;
 
+use byteorder::{LittleEndian, WriteBytesExt};
 use num::FromPrimitive;
 use nom::{le_u8, le_u16, le_i32, le_u32};
 
@@ -53,6 +55,8 @@ fn test_decode_crushmap() {
         0x73, 0x65, 0x74, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00, 0x01,
         0x00, 0x00, 0x00, 0x00, 0x01,
     ];
+
+    println!("crushmap compiled len {}", crushmap_compiled.len());
     let expected_result = CrushMap{
         magic: 65536,
         max_buckets: 8,
@@ -62,6 +66,7 @@ fn test_decode_crushmap() {
             BucketTypes::Straw(
                 CrushBucketStraw {
                     bucket: Bucket {
+                        struct_size: 4,
                         id: -1,
                         bucket_type: OpCode::SetChooseLocalTries,
                         alg: BucketAlg::Straw,
@@ -74,11 +79,11 @@ fn test_decode_crushmap() {
                     },
                     item_weights: vec![(0, 0), (0, 0), (0, 0)] }),
             BucketTypes::Straw(CrushBucketStraw {
-                bucket: Bucket { id: -2, bucket_type: OpCode::Take, alg: BucketAlg::Straw, hash: 0, weight: 0, size: 1, items: vec![0], perm_n: 0, perm: 1 }, item_weights: vec![(0, 0)] }),
+                bucket: Bucket { id: -2, struct_size: 4, bucket_type: OpCode::Take, alg: BucketAlg::Straw, hash: 0, weight: 0, size: 1, items: vec![0], perm_n: 0, perm: 1 }, item_weights: vec![(0, 0)] }),
             BucketTypes::Straw(CrushBucketStraw {
-                bucket: Bucket { id: -3, bucket_type: OpCode::Take, alg: BucketAlg::Straw, hash: 0, weight: 0, size: 1, items: vec![1], perm_n: 0, perm: 1 }, item_weights: vec![(0, 0)] }),
+                bucket: Bucket { id: -3, struct_size: 4, bucket_type: OpCode::Take, alg: BucketAlg::Straw, hash: 0, weight: 0, size: 1, items: vec![1], perm_n: 0, perm: 1 }, item_weights: vec![(0, 0)] }),
             BucketTypes::Straw(CrushBucketStraw {
-                bucket: Bucket { id: -4, bucket_type: OpCode::Take, alg: BucketAlg::Straw, hash: 0, weight: 0, size: 1, items: vec![2], perm_n: 0, perm: 1 }, item_weights: vec![(0, 0)] }),
+                bucket: Bucket { id: -4, struct_size: 4, bucket_type: OpCode::Take, alg: BucketAlg::Straw, hash: 0, weight: 0, size: 1, items: vec![2], perm_n: 0, perm: 1 }, item_weights: vec![(0, 0)] }),
             BucketTypes::Unknown, BucketTypes::Unknown, BucketTypes::Unknown, BucketTypes::Unknown],
         rules: vec![
             Some(
@@ -130,6 +135,120 @@ fn test_decode_crushmap() {
     assert_eq!(nom::IResult::Done(x, expected_result), result);
 }
 
+#[test]
+fn test_encode_crushmap() {
+    let expected_result: Vec<u8> = vec![
+        0x00, 0x00, 0x01, 0x00, 0x08, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
+        0x04, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0x0a, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x03, 0x00, 0x00, 0x00, 0xfe, 0xff, 0xff, 0xff, 0xfd, 0xff, 0xff, 0xff, 0xfc, 0xff, 0xff, 0xff,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0xfe, 0xff, 0xff, 0xff,
+        0x01, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0xfd, 0xff, 0xff, 0xff,
+        0x01, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0xfc, 0xff, 0xff, 0xff,
+        0x01, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
+        0x00, 0x01, 0x01, 0x0a, 0x01, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00,
+        0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x03, 0x00, 0x00, 0x00, 0x6f, 0x73, 0x64, 0x01, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x68,
+        0x6f, 0x73, 0x74, 0x02, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x63, 0x68, 0x61, 0x73, 0x73,
+        0x69, 0x73, 0x03, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x72, 0x61, 0x63, 0x6b, 0x04, 0x00,
+        0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x72, 0x6f, 0x77, 0x05, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00,
+        0x00, 0x70, 0x64, 0x75, 0x06, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x70, 0x6f, 0x64, 0x07,
+        0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x72, 0x6f, 0x6f, 0x6d, 0x08, 0x00, 0x00, 0x00, 0x0a,
+        0x00, 0x00, 0x00, 0x64, 0x61, 0x74, 0x61, 0x63, 0x65, 0x6e, 0x74, 0x65, 0x72, 0x09, 0x00, 0x00,
+        0x00, 0x06, 0x00, 0x00, 0x00, 0x72, 0x65, 0x67, 0x69, 0x6f, 0x6e, 0x0a, 0x00, 0x00, 0x00, 0x04,
+        0x00, 0x00, 0x00, 0x72, 0x6f, 0x6f, 0x74, 0x07, 0x00, 0x00, 0x00, 0xfc, 0xff, 0xff, 0xff, 0x0e,
+        0x00, 0x00, 0x00, 0x69, 0x70, 0x2d, 0x31, 0x37, 0x32, 0x2d, 0x33, 0x31, 0x2d, 0x34, 0x2d, 0x35,
+        0x36, 0xfd, 0xff, 0xff, 0xff, 0x0e, 0x00, 0x00, 0x00, 0x69, 0x70, 0x2d, 0x31, 0x37, 0x32, 0x2d,
+        0x33, 0x31, 0x2d, 0x32, 0x32, 0x2d, 0x32, 0xfe, 0xff, 0xff, 0xff, 0x10, 0x00, 0x00, 0x00, 0x69,
+        0x70, 0x2d, 0x31, 0x37, 0x32, 0x2d, 0x33, 0x31, 0x2d, 0x34, 0x33, 0x2d, 0x31, 0x34, 0x37, 0xff,
+        0xff, 0xff, 0xff, 0x07, 0x00, 0x00, 0x00, 0x64, 0x65, 0x66, 0x61, 0x75, 0x6c, 0x74, 0x00, 0x00,
+        0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x6f, 0x73, 0x64, 0x2e, 0x30, 0x01, 0x00, 0x00, 0x00, 0x05,
+        0x00, 0x00, 0x00, 0x6f, 0x73, 0x64, 0x2e, 0x31, 0x02, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,
+        0x6f, 0x73, 0x64, 0x2e, 0x32, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x12, 0x00, 0x00,
+        0x00, 0x72, 0x65, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x74, 0x65, 0x64, 0x5f, 0x72, 0x75, 0x6c, 0x65,
+        0x73, 0x65, 0x74, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00, 0x01,
+        0x00, 0x00, 0x00, 0x00, 0x01,
+    ];
+    let crushmap = CrushMap{
+        magic: 65536,
+        max_buckets: 8,
+        max_rules: 1,
+        max_devices: 3,
+        buckets: vec![
+            BucketTypes::Straw(
+                CrushBucketStraw {
+                    bucket: Bucket {
+                        struct_size: 4,
+                        id: -1,
+                        bucket_type: OpCode::SetChooseLocalTries,
+                        alg: BucketAlg::Straw,
+                        hash: 0,
+                        weight: 0,
+                        size: 3,
+                        items: vec![-2, -3, -4],
+                        perm_n: 0,
+                        perm: 3
+                    },
+                    item_weights: vec![(0, 0), (0, 0), (0, 0)] }),
+            BucketTypes::Straw(CrushBucketStraw {
+                bucket: Bucket { id: -2, struct_size: 4, bucket_type: OpCode::Take, alg: BucketAlg::Straw, hash: 0, weight: 0, size: 1, items: vec![0], perm_n: 0, perm: 1 }, item_weights: vec![(0, 0)] }),
+            BucketTypes::Straw(CrushBucketStraw {
+                bucket: Bucket { id: -3, struct_size: 4, bucket_type: OpCode::Take, alg: BucketAlg::Straw, hash: 0, weight: 0, size: 1, items: vec![1], perm_n: 0, perm: 1 }, item_weights: vec![(0, 0)] }),
+            BucketTypes::Straw(CrushBucketStraw {
+                bucket: Bucket { id: -4, struct_size: 4, bucket_type: OpCode::Take, alg: BucketAlg::Straw, hash: 0, weight: 0, size: 1, items: vec![2], perm_n: 0, perm: 1 }, item_weights: vec![(0, 0)] }),
+            BucketTypes::Unknown, BucketTypes::Unknown, BucketTypes::Unknown, BucketTypes::Unknown],
+        rules: vec![
+            Some(
+                Rule {
+                    len: 3,
+                    mask: CrushRuleMask {
+                        ruleset: 0,
+                        rule_type: 1,
+                        min_size: 1,
+                        max_size: 10 },
+                    steps: vec![
+                        CrushRuleStep {
+                            op: 1,
+                            arg1: -1,
+                            arg2: 0 },
+                        CrushRuleStep { op: 6, arg1: 0, arg2: 1 },
+                        CrushRuleStep { op: 4, arg1: 0, arg2: 0 }] })],
+        type_map: vec![ (0, "osd".to_string()),
+                        (1, "host".to_string()),
+                        (2, "chassis".to_string()),
+                        (3, "rack".to_string()),
+                        (4, "row".to_string()),
+                        (5, "pdu".to_string()),
+                        (6, "pod".to_string()),
+                        (7, "room".to_string()),
+                        (8, "datacenter".to_string()),
+                        (9, "region".to_string()),
+                        (10, "root".to_string())],
+        name_map: vec![
+            (-4, "ip-172-31-4-56".to_string()),
+            (-3, "ip-172-31-22-2".to_string()),
+            (-2, "ip-172-31-43-147".to_string()),
+            (-1, "default".to_string()),
+            (0, "osd.0".to_string()),
+            (1, "osd.1".to_string()),
+            (2, "osd.2".to_string())],
+        rule_name_map: vec![(0, "replicated_ruleset".to_string())],
+        choose_local_tries: Some(0),
+        choose_local_fallback_tries: Some(0),
+        choose_total_tries: Some(50),
+        chooseleaf_descend_once: Some(1),
+        chooseleaf_vary_r: Some(0),
+        straw_calc_version: Some(1),
+        choose_tries: None
+    };
+    let result = encode_crushmap(crushmap);
+    assert_eq!(expected_result, result.unwrap());
+}
 /*
 //TODO: Set default tunables to optimal
 fn set_tunables_firefly<'a>(input: &'a mut CrushMap) ->&'a mut CrushMap{
@@ -147,6 +266,34 @@ fn set_tunables_optimal<'a>(input: &'a mut CrushMap) ->&'a mut CrushMap{
   input
 }
 */
+
+#[derive(Debug)]
+pub enum EncodingError {
+	IoError(io::Error),
+	InvalidValue,
+	InvalidType,
+    FromUtf8Error(FromUtf8Error),
+}
+
+impl EncodingError{
+    pub fn new(err: String) -> EncodingError {
+        EncodingError::IoError(
+            io::Error::new(ErrorKind::Other, err)
+        )
+    }
+}
+
+impl From<FromUtf8Error> for EncodingError {
+    fn from(err: FromUtf8Error) -> EncodingError {
+        EncodingError::FromUtf8Error(err)
+    }
+}
+
+impl From<io::Error> for EncodingError {
+    fn from(err: io::Error) -> EncodingError {
+        EncodingError::IoError(err)
+    }
+}
 
 /*
  * A bucket is a named container of other items (either devices or
@@ -176,7 +323,7 @@ enum_from_primitive!{
 /* step op codes */
 enum_from_primitive!{
     #[repr(u16)]
-    #[derive(Debug, Eq, PartialEq)]
+    #[derive(Debug, Clone, Eq, PartialEq)]
     enum OpCode{
         Noop = 0,
         Take = 1,          /* arg1 = value to start with */
@@ -216,8 +363,12 @@ impl CrushBucketUniform{
         )
     }
 
-    fn encode(&self) -> Result<Vec<u8>, String>{
-        return Ok(vec![]);
+    fn encode(&self) -> Result<Vec<u8>, EncodingError>{
+        let mut buffer: Vec<u8> = Vec::new();
+        buffer.extend(try!(self.bucket.encode()));
+        try!(buffer.write_u32::<LittleEndian>(self.item_weight));
+
+        Ok(buffer)
     }
 }
 
@@ -244,8 +395,17 @@ impl CrushBucketList{
             }
         )
     }
-    fn encode(&self) -> Result<Vec<u8>, String>{
-        return Ok(vec![]);
+
+    fn encode(&self) -> Result<Vec<u8>, EncodingError>{
+        let mut buffer: Vec<u8> = Vec::new();
+        buffer.extend(try!(self.bucket.encode()));
+
+        for weights in self.item_weights.iter(){
+            try!(buffer.write_u32::<LittleEndian>(weights.0));
+            try!(buffer.write_u32::<LittleEndian>(weights.1));
+        }
+
+        Ok(buffer)
     }
 }
 
@@ -274,8 +434,17 @@ impl CrushBucketTree{
             }
         )
     }
-    fn encode(&self) -> Result<Vec<u8>, String>{
-        return Ok(vec![]);
+    fn encode(&self) -> Result<Vec<u8>, EncodingError>{
+        let mut buffer: Vec<u8> = Vec::new();
+        buffer.extend(try!(self.bucket.encode()));
+
+        try!(buffer.write_u8(self.num_nodes));
+
+        for weight in self.node_weights.iter(){
+            try!(buffer.write_u32::<LittleEndian>(*weight));
+        }
+
+        Ok(buffer)
     }
 }
 
@@ -302,8 +471,16 @@ impl CrushBucketStraw{
             }
         )
     }
-    fn encode(&self) -> Result<Vec<u8>, String>{
-        return Ok(vec![]);
+    fn encode(&self) -> Result<Vec<u8>, EncodingError>{
+        let mut buffer: Vec<u8> = Vec::new();
+        buffer.extend(try!(self.bucket.encode()));
+
+        for weights in self.item_weights.iter(){
+            try!(buffer.write_u32::<LittleEndian>(weights.0));
+            try!(buffer.write_u32::<LittleEndian>(weights.1));
+        }
+
+        Ok(buffer)
     }
 }
 
@@ -378,6 +555,23 @@ fn parse_string_map(input: & [u8])->nom::IResult<&[u8], Vec<(i32,String)>>{
     )
 }
 
+fn encode_string_map(input: Vec<(i32, String)>)->Result<Vec<u8>, EncodingError>{
+    let mut buffer = Vec::new();
+    //Count
+    try!(buffer.write_u32::<LittleEndian>(input.len() as u32));
+
+    for pair in input.into_iter(){
+        try!(buffer.write_i32::<LittleEndian>(pair.0));
+
+        //String length
+        try!(buffer.write_u32::<LittleEndian>(pair.1.len() as u32));
+        //String data
+        buffer.extend(pair.1.into_bytes());
+    }
+
+    Ok(buffer)
+}
+
 fn parse_bucket<'a>(input: &'a [u8]) -> nom::IResult<&[u8], BucketTypes>{
     trace!("parse_bucket input: {:?}", input);
     let alg_type_bits = le_u32(input);
@@ -445,6 +639,7 @@ fn parse_bucket<'a>(input: &'a [u8]) -> nom::IResult<&[u8], BucketTypes>{
 
 #[derive(Debug, Eq, PartialEq)]
 struct Bucket{
+    struct_size: u32,
     id: i32,          /* this'll be negative */
     bucket_type: OpCode, /* non-zero; type=0 is reserved for devices */
     alg: BucketAlg,          /* one of CRUSH_BUCKET_* */
@@ -479,6 +674,7 @@ impl Bucket{
             items: dbg!(count!(le_i32, size as usize)),
             ||{
                 Bucket{
+                    struct_size: struct_size,
                     id: id,
                     bucket_type: bucket_type,
                     alg: alg,
@@ -492,8 +688,21 @@ impl Bucket{
             }
         )
     }
-    fn encode(&self) -> Result<Vec<u8>, String>{
-        return Ok(vec![]);
+    fn encode(&self) -> Result<Vec<u8>, EncodingError>{
+        let mut buffer: Vec<u8> = Vec::new();
+        try!(buffer.write_u32::<LittleEndian>(self.struct_size));
+        try!(buffer.write_i32::<LittleEndian>(self.id));
+        try!(buffer.write_u16::<LittleEndian>(self.bucket_type.clone() as u16));
+        try!(buffer.write_u8(self.alg.clone() as u8));
+        try!(buffer.write_u8(self.hash));
+        try!(buffer.write_u32::<LittleEndian>(self.weight));
+        try!(buffer.write_u32::<LittleEndian>(self.size));
+
+        for item in self.items.iter(){
+            try!(buffer.write_i32::<LittleEndian>(*item));
+        }
+
+        Ok(buffer)
     }
 }
 
@@ -526,8 +735,13 @@ impl CrushRuleStep{
             }
         )
     }
-    fn encode(&self) -> Result<Vec<u8>, String>{
-        return Ok(vec![]);
+    fn encode(&self) -> Result<Vec<u8>, EncodingError>{
+        let mut buffer: Vec<u8> = Vec::new();
+        try!(buffer.write_u32::<LittleEndian>(self.op));
+        try!(buffer.write_i32::<LittleEndian>(self.arg1));
+        try!(buffer.write_i32::<LittleEndian>(self.arg2));
+
+        Ok(buffer)
     }
 }
 
@@ -563,8 +777,14 @@ impl CrushRuleMask{
             }
         )
     }
-    fn encode(&self) -> Result<Vec<u8>, String>{
-        return Ok(vec![]);
+    fn encode(&self) -> Result<Vec<u8>, EncodingError>{
+        let mut buffer: Vec<u8> = Vec::new();
+        try!(buffer.write_u8(self.ruleset));
+        try!(buffer.write_u8(self.rule_type));
+        try!(buffer.write_u8(self.min_size));
+        try!(buffer.write_u8(self.max_size));
+
+        Ok(buffer)
     }
 }
 
@@ -607,8 +827,19 @@ impl Rule{
             },
         }
     }
-    fn encode(&self) -> Result<Vec<u8>, String>{
-        return Ok(vec![]);
+    fn encode(&self) -> Result<Vec<u8>, EncodingError>{
+        let mut buffer: Vec<u8> = Vec::new();
+        //YES
+        try!(buffer.write_u32::<LittleEndian>(1));
+
+        try!(buffer.write_u32::<LittleEndian>(self.len));
+        buffer.extend(try!(self.mask.encode()));
+        //Steps length
+        for step in self.steps.iter(){
+            buffer.extend(try!(step.encode()));
+        }
+
+        Ok(buffer)
     }
 }
 
@@ -703,8 +934,74 @@ fn parse_crushmap<'a>(input: &'a [u8]) -> nom::IResult<&[u8], CrushMap>{
         }
     )
 }
-fn encode_crushmap(&self) -> Result<Vec<u8>, String>{
-    return Ok(vec![]);
+fn encode_crushmap(crushmap: CrushMap) -> Result<Vec<u8>, EncodingError>{
+    let mut buffer: Vec<u8> = Vec::new();
+    try!(buffer.write_u32::<LittleEndian>(CRUSH_MAGIC));
+
+    try!(buffer.write_i32::<LittleEndian>(crushmap.max_buckets));
+    try!(buffer.write_u32::<LittleEndian>(crushmap.max_rules));
+    try!(buffer.write_i32::<LittleEndian>(crushmap.max_devices));
+
+    for bucket in crushmap.buckets.iter(){
+        match bucket{
+            &BucketTypes::Uniform(ref uniform) =>{
+                trace!("Trying to encode uniform bucket");
+                buffer.extend(try!(uniform.encode()));
+            },
+            &BucketTypes::List(ref list) => {
+                trace!("Trying to encode list bucket");
+                buffer.extend(try!(list.encode()));
+            },
+            &BucketTypes::Tree(ref tree) => {
+                trace!("Trying to encode tree bucket");
+                buffer.extend(try!(tree.encode()));
+            },
+            &BucketTypes::Straw(ref straw) => {
+                trace!("Trying to encode straw bucket");
+                buffer.extend(try!(straw.encode()));
+            },
+            &BucketTypes::Unknown => {
+                try!(buffer.write_u32::<LittleEndian>(0));
+            }
+        }
+    }
+
+    for rule in crushmap.rules.into_iter(){
+        if rule.is_some(){
+            let unwrapped_rule = rule.unwrap();
+            buffer.extend(try!(unwrapped_rule.encode()));
+        }else{
+            //yes bits == 0
+            try!(buffer.write_u32::<LittleEndian>(0));
+        }
+    }
+    buffer.extend(try!(encode_string_map(crushmap.type_map)));
+    buffer.extend(try!(encode_string_map(crushmap.name_map)));
+    buffer.extend(try!(encode_string_map(crushmap.rule_name_map)));
+
+    if crushmap.choose_local_tries.is_some(){
+        try!(buffer.write_u32::<LittleEndian>(crushmap.choose_local_tries.unwrap()));
+    }
+    if crushmap.choose_local_fallback_tries.is_some(){
+        try!(buffer.write_u32::<LittleEndian>(crushmap.choose_local_fallback_tries.unwrap()));
+    }
+    if crushmap.choose_total_tries.is_some(){
+        try!(buffer.write_u32::<LittleEndian>(crushmap.choose_total_tries.unwrap()));
+    }
+    if crushmap.chooseleaf_descend_once.is_some(){
+        try!(buffer.write_u32::<LittleEndian>(crushmap.chooseleaf_descend_once.unwrap()));
+    }
+    if crushmap.chooseleaf_vary_r.is_some(){
+        try!(buffer.write_u8(crushmap.chooseleaf_vary_r.unwrap()));
+    }
+    if crushmap.straw_calc_version.is_some(){
+        try!(buffer.write_u8(crushmap.straw_calc_version.unwrap()));
+    }
+    if crushmap.choose_tries.is_some(){
+        try!(buffer.write_u32::<LittleEndian>(crushmap.choose_tries.unwrap()));
+    }
+
+    Ok(buffer)
 }
 
 fn main() {
