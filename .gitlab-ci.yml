@@ -1,0 +1,29 @@
+image: iceyec/ci-rust
+
+cache:
+  key: $CI_BUILD_STAGE/$CI_BUILD_REF_NAME
+  paths:
+    - $HOME/.cargo
+
+stages:
+  - test
+
+test-stable:
+  script:
+    - curl -sSf https://static.rust-lang.org/rustup.sh | sh -s -- -y --disable-sudo
+    - cargo build --release --verbose
+    - cargo test --verbose
+
+test-beta:
+  allow_failure: true
+  script:
+    - curl -sSf https://static.rust-lang.org/rustup.sh | sh -s -- -y --disable-sudo --channel=beta
+    - cargo build --release --verbose
+    - cargo test --verbose
+
+test-nightly:
+  allow_failure: true
+  script:
+    - curl -sSf https://static.rust-lang.org/rustup.sh | sh -s -- -y --disable-sudo --channel=nightly
+    - cargo build --release --verbose
+    - cargo test --verbose
