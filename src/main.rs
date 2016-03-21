@@ -215,6 +215,10 @@ impl CrushBucketUniform{
             }
         )
     }
+
+    fn encode(&self) -> Result<Vec<u8>, String>{
+        return Ok(vec![]);
+    }
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -239,6 +243,9 @@ impl CrushBucketList{
                 }
             }
         )
+    }
+    fn encode(&self) -> Result<Vec<u8>, String>{
+        return Ok(vec![]);
     }
 }
 
@@ -267,6 +274,9 @@ impl CrushBucketTree{
             }
         )
     }
+    fn encode(&self) -> Result<Vec<u8>, String>{
+        return Ok(vec![]);
+    }
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -291,6 +301,9 @@ impl CrushBucketStraw{
                 }
             }
         )
+    }
+    fn encode(&self) -> Result<Vec<u8>, String>{
+        return Ok(vec![]);
     }
 }
 
@@ -479,6 +492,9 @@ impl Bucket{
             }
         )
     }
+    fn encode(&self) -> Result<Vec<u8>, String>{
+        return Ok(vec![]);
+    }
 }
 
 /*
@@ -509,6 +525,9 @@ impl CrushRuleStep{
                 }
             }
         )
+    }
+    fn encode(&self) -> Result<Vec<u8>, String>{
+        return Ok(vec![]);
     }
 }
 
@@ -543,6 +562,9 @@ impl CrushRuleMask{
                 }
             }
         )
+    }
+    fn encode(&self) -> Result<Vec<u8>, String>{
+        return Ok(vec![]);
     }
 }
 
@@ -584,6 +606,9 @@ impl Rule{
                 return nom::IResult::Error(e);
             },
         }
+    }
+    fn encode(&self) -> Result<Vec<u8>, String>{
+        return Ok(vec![]);
     }
 }
 
@@ -677,6 +702,9 @@ fn parse_crushmap<'a>(input: &'a [u8]) -> nom::IResult<&[u8], CrushMap>{
             }
         }
     )
+}
+fn encode_crushmap(&self) -> Result<Vec<u8>, String>{
+    return Ok(vec![]);
 }
 
 fn main() {
