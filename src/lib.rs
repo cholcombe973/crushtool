@@ -90,16 +90,13 @@ fn test_decode_crushmap() {
                     len: 3,
                     mask: CrushRuleMask {
                         ruleset: 0,
-                        rule_type: 1,
+                        rule_type: RuleType::Replicated,
                         min_size: 1,
                         max_size: 10 },
                     steps: vec![
-                        CrushRuleStep {
-                            op: 1,
-                            arg1: -1,
-                            arg2: 0 },
-                        CrushRuleStep { op: 6, arg1: 0, arg2: 1 },
-                        CrushRuleStep { op: 4, arg1: 0, arg2: 0 }] })],
+                        CrushRuleStep { op: OpCode::Take, arg1: (-1, None), arg2: (0, Some("osd".to_string())) },
+                        CrushRuleStep { op: OpCode::ChooseLeafFirstN, arg1: (0, Some("osd".to_string())), arg2: (1, Some("host".to_string())) },
+                        CrushRuleStep { op: OpCode::Emit, arg1: (0, Some("osd".to_string())), arg2: (0, Some("osd".to_string())) }] })],
         type_map: vec![ (0, "osd".to_string()),
                         (1, "host".to_string()),
                         (2, "chassis".to_string()),
@@ -128,10 +125,10 @@ fn test_decode_crushmap() {
         straw_calc_version: Some(1),
         choose_tries: None
     };
-    let result = parse_crushmap(&crushmap_compiled);
+    let result = decode_crushmap(&crushmap_compiled);
     println!("crushmap {:?}", result);
     let x: &[u8] = &[];
-    assert_eq!(nom::IResult::Done(x, expected_result), result);
+    assert_eq!(Ok(expected_result), result);
 }
 
 #[test]
@@ -207,16 +204,16 @@ fn test_encode_crushmap() {
                     len: 3,
                     mask: CrushRuleMask {
                         ruleset: 0,
-                        rule_type: 1,
+                        rule_type: RuleType::Replicated,
                         min_size: 1,
                         max_size: 10 },
                     steps: vec![
                         CrushRuleStep {
-                            op: 1,
-                            arg1: -1,
-                            arg2: 0 },
-                        CrushRuleStep { op: 6, arg1: 0, arg2: 1 },
-                        CrushRuleStep { op: 4, arg1: 0, arg2: 0 }] })],
+                            op: OpCode::Take,
+                            arg1: (-1, None),
+                            arg2: (0, Some("osd".to_string())) },
+                        CrushRuleStep { op: OpCode::ChooseLeafFirstN, arg1: (0, Some("osd".to_string())), arg2: (1, Some("host".to_string())) },
+                        CrushRuleStep { op: OpCode::Emit, arg1: (0, Some("osd".to_string())), arg2: (0, Some("osd".to_string())) }] })],
         type_map: vec![ (0, "osd".to_string()),
                         (1, "host".to_string()),
                         (2, "chassis".to_string()),
@@ -319,6 +316,16 @@ enum_from_primitive!{
     }
 }
 
+enum_from_primitive!{
+    #[repr(u8)]
+    #[derive(Debug, Clone, Eq, PartialEq)]
+    pub enum RuleType{
+        Replicated = 1,
+        Raid4 = 2, //NOTE: never implemented
+        Erasure = 3,
+    }
+}
+
 /* step op codes */
 enum_from_primitive!{
     #[repr(u16)]
@@ -341,7 +348,7 @@ enum_from_primitive!{
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct CrushBucketUniform {
     pub bucket: Bucket,
     pub item_weight: u32,  /* 16-bit fixed point; all items equally weighted */
@@ -371,7 +378,7 @@ impl CrushBucketUniform{
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct CrushBucketList {
     pub bucket: Bucket,
     pub item_weights: Vec<(u32, u32)>,  /* 16-bit fixed point */
@@ -408,7 +415,7 @@ impl CrushBucketList{
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct CrushBucketTree {
     /* note: h.size is _tree_ size, not number of
            actual items */
@@ -447,7 +454,7 @@ impl CrushBucketTree{
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct CrushBucketStraw {
     pub bucket: Bucket,
     pub item_weights: Vec<(u32, u32)>,   /* 16-bit fixed point */
@@ -483,7 +490,7 @@ impl CrushBucketStraw{
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum BucketTypes{
     Uniform(CrushBucketUniform),
     List(CrushBucketList),
@@ -636,7 +643,7 @@ fn parse_bucket<'a>(input: &'a [u8]) -> nom::IResult<&[u8], BucketTypes>{
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Bucket{
     pub struct_size: u32,
     pub id: i32,          /* this'll be negative */
@@ -710,11 +717,11 @@ impl Bucket{
  * mapped to devices.  A rule consists of sequence of steps to perform
  * to generate the set of output devices.
  */
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct CrushRuleStep {
-    pub op: u32,
-    pub arg1: i32,
-    pub arg2: i32,
+    pub op: OpCode,
+    pub arg1: (i32, Option<String>),
+    pub arg2: (i32, Option<String>),
 }
 
 impl CrushRuleStep{
@@ -722,23 +729,37 @@ impl CrushRuleStep{
         trace!("rule step input: {:?}", input);
         chain!(
             input,
-            op: le_u32~
+            op_bits: le_u32~
+            op_code: expr_opt!(OpCode::from_u32(op_bits)) ~
             arg1: le_i32~
             arg2: le_i32,
             ||{
                 CrushRuleStep{
-                    op: op,
-                    arg1: arg1,
-                    arg2: arg2,
+                    op: op_code,
+                    //These get resolved later once we know the type_map
+                    arg1: (arg1, None),
+                    arg2: (arg2, None),
                 }
             }
         )
     }
+    //Change the arg's.1 from None to a proper name
+    fn update_arg_mapping(&mut self, type_map: &Vec<(i32, String)>){
+        println!("Updating arg mapping with {:?}", type_map);
+        for tuple in type_map{
+            if tuple.0 == self.arg1.0{
+                self.arg1.1 = Some(tuple.1.clone());
+            }
+            if tuple.0 == self.arg2.0{
+                self.arg2.1 = Some(tuple.1.clone());
+            }
+        }
+    }
     fn encode(&self) -> Result<Vec<u8>, EncodingError>{
         let mut buffer: Vec<u8> = Vec::new();
-        try!(buffer.write_u32::<LittleEndian>(self.op));
-        try!(buffer.write_i32::<LittleEndian>(self.arg1));
-        try!(buffer.write_i32::<LittleEndian>(self.arg2));
+        try!(buffer.write_u32::<LittleEndian>(self.op.clone() as u32));
+        try!(buffer.write_i32::<LittleEndian>(self.arg1.0));
+        try!(buffer.write_i32::<LittleEndian>(self.arg2.0));
 
         Ok(buffer)
     }
@@ -749,10 +770,10 @@ impl CrushRuleStep{
  * Given a ruleset and size of output set, we search through the
  * rule list for a matching rule_mask.
  */
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct CrushRuleMask {
     pub ruleset: u8,
-    pub rule_type: u8,
+    pub rule_type: RuleType,
     pub min_size: u8,
     pub max_size: u8,
 }
@@ -763,7 +784,8 @@ impl CrushRuleMask{
         chain!(
             input,
             ruleset: le_u8~
-            rule_type: le_u8~
+            rule_type_bits: le_u8 ~
+            rule_type: expr_opt!(RuleType::from_u8(rule_type_bits)) ~
             min_size: le_u8~
             max_size: le_u8,
             ||{
@@ -779,7 +801,7 @@ impl CrushRuleMask{
     fn encode(&self) -> Result<Vec<u8>, EncodingError>{
         let mut buffer: Vec<u8> = Vec::new();
         try!(buffer.write_u8(self.ruleset));
-        try!(buffer.write_u8(self.rule_type));
+        try!(buffer.write_u8(self.rule_type.clone() as u8));
         try!(buffer.write_u8(self.min_size));
         try!(buffer.write_u8(self.max_size));
 
@@ -787,7 +809,7 @@ impl CrushRuleMask{
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Rule{
     pub len: u32,
     pub mask: CrushRuleMask,
@@ -842,7 +864,30 @@ impl Rule{
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+//Try to update the CrushRuleStep's now that we know the type_map.  I wish Ceph
+//had included the type_map first in the compiled crush so I could skip this workaround.
+fn update_rule_steps(rules: &mut Vec<Option<Rule>>,
+                   type_map: &Vec<(i32, String)>)->Vec<Option<Rule>>{
+    let mut updated_rules:Vec<Option<Rule>> = Vec::new();
+
+    for rule in rules.iter_mut(){
+        match *rule{
+            Some(ref mut r) => {
+                for step in r.steps.iter_mut(){
+                    step.update_arg_mapping(type_map)
+                }
+                updated_rules.push(Some(r.clone()));
+            }
+            None => {
+                //Skip None's
+                updated_rules.push(None);
+            }
+        }
+    }
+    updated_rules
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct CrushMap {
     pub magic: u32,
     pub max_buckets: i32,
@@ -878,7 +923,25 @@ pub struct CrushMap {
     pub choose_tries: Option<u32>,
 }
 
-pub fn parse_crushmap<'a>(input: &'a [u8]) -> nom::IResult<&[u8], CrushMap>{
+pub fn decode_crushmap<'a>(input: &'a [u8]) ->Result<CrushMap, String>{
+    let mut result = parse_crushmap(input);
+    match result{
+        nom::IResult::Done(unparsed_input, ref mut map) => {
+            let updated_rules = update_rule_steps(&mut map.rules, &map.type_map);
+            map.rules = updated_rules;
+            //TODO: Can we get rid of this clone?
+            return Ok(map.clone());
+        },
+        nom::IResult::Error(e) => {
+            Err("parsing error".to_string())
+        },
+        nom::IResult::Incomplete(needed) => {
+            Err("Incomplete".to_string())
+        },
+    }
+}
+
+fn parse_crushmap<'a>(input: &'a [u8]) -> nom::IResult<&[u8], CrushMap>{
     trace!("crushmap input: {:?}", input);
     chain!(
         input,
@@ -1001,6 +1064,10 @@ pub fn encode_crushmap(crushmap: CrushMap) -> Result<Vec<u8>, EncodingError>{
     }
 
     Ok(buffer)
+}
+
+pub fn get_failure_domain_for_rule(rule_number: u32){
+
 }
 
 fn main() {
