@@ -13,7 +13,6 @@ use std::string::FromUtf8Error;
 use byteorder::{LittleEndian, WriteBytesExt};
 use num::FromPrimitive;
 use nom::{le_u8, le_u16, le_i32, le_u32};
-
 static CRUSH_MAGIC: u32 = 0x00010000;  /* for detecting algorithm revisions */
 
 #[test]
@@ -312,7 +311,7 @@ impl From<io::Error> for EncodingError {
 enum_from_primitive!{
     #[repr(u8)]
     #[derive(Debug, Clone, Eq, PartialEq)]
-    enum BucketAlg{
+    pub enum BucketAlg{
         Uniform = 1,
         List = 2,
         Tree = 3,
@@ -324,7 +323,7 @@ enum_from_primitive!{
 enum_from_primitive!{
     #[repr(u16)]
     #[derive(Debug, Clone, Eq, PartialEq)]
-    enum OpCode{
+    pub enum OpCode{
         Noop = 0,
         Take = 1,          /* arg1 = value to start with */
         ChooseFirstN = 2, /* arg1 = num items to pick */
@@ -343,9 +342,9 @@ enum_from_primitive!{
 }
 
 #[derive(Debug, Eq, PartialEq)]
-struct CrushBucketUniform {
-    bucket: Bucket,
-    item_weight: u32,  /* 16-bit fixed point; all items equally weighted */
+pub struct CrushBucketUniform {
+    pub bucket: Bucket,
+    pub item_weight: u32,  /* 16-bit fixed point; all items equally weighted */
 }
 
 impl CrushBucketUniform{
@@ -373,9 +372,9 @@ impl CrushBucketUniform{
 }
 
 #[derive(Debug, Eq, PartialEq)]
-struct CrushBucketList {
-    bucket: Bucket,
-    item_weights: Vec<(u32, u32)>,  /* 16-bit fixed point */
+pub struct CrushBucketList {
+    pub bucket: Bucket,
+    pub item_weights: Vec<(u32, u32)>,  /* 16-bit fixed point */
     //sum_weights: u32,   /* 16-bit fixed point.  element i is sum
     //             of weights 0..i, inclusive */
 }
@@ -410,12 +409,12 @@ impl CrushBucketList{
 }
 
 #[derive(Debug, Eq, PartialEq)]
-struct CrushBucketTree {
+pub struct CrushBucketTree {
     /* note: h.size is _tree_ size, not number of
            actual items */
-    bucket: Bucket,
-    num_nodes: u8,
-    node_weights: Vec<u32>,
+    pub bucket: Bucket,
+    pub num_nodes: u8,
+    pub node_weights: Vec<u32>,
 }
 
 impl CrushBucketTree{
@@ -449,9 +448,9 @@ impl CrushBucketTree{
 }
 
 #[derive(Debug, Eq, PartialEq)]
-struct CrushBucketStraw {
-    bucket: Bucket,
-    item_weights: Vec<(u32, u32)>,   /* 16-bit fixed point */
+pub struct CrushBucketStraw {
+    pub bucket: Bucket,
+    pub item_weights: Vec<(u32, u32)>,   /* 16-bit fixed point */
     //straws: u32,         /* 16-bit fixed point */
 }
 
@@ -485,7 +484,7 @@ impl CrushBucketStraw{
 }
 
 #[derive(Debug, Eq, PartialEq)]
-enum BucketTypes{
+pub enum BucketTypes{
     Uniform(CrushBucketUniform),
     List(CrushBucketList),
     Tree(CrushBucketTree),
@@ -638,22 +637,22 @@ fn parse_bucket<'a>(input: &'a [u8]) -> nom::IResult<&[u8], BucketTypes>{
 }
 
 #[derive(Debug, Eq, PartialEq)]
-struct Bucket{
-    struct_size: u32,
-    id: i32,          /* this'll be negative */
-    bucket_type: OpCode, /* non-zero; type=0 is reserved for devices */
-    alg: BucketAlg,          /* one of CRUSH_BUCKET_* */
-    hash: u8,         /* which hash function to use, CRUSH_HASH_* */
-    weight: u32,      /* 16-bit fixed point */
-    size: u32,        /* num items */
-    items: Vec<i32>,
+pub struct Bucket{
+    pub struct_size: u32,
+    pub id: i32,          /* this'll be negative */
+    pub bucket_type: OpCode, /* non-zero; type=0 is reserved for devices */
+    pub alg: BucketAlg,          /* one of CRUSH_BUCKET_* */
+    pub hash: u8,         /* which hash function to use, CRUSH_HASH_* */
+    pub weight: u32,      /* 16-bit fixed point */
+    pub size: u32,        /* num items */
+    pub items: Vec<i32>,
     /*
      * cached random permutation: used for uniform bucket and for
      * the linear search fallback for the other bucket types.
      */
     //perm_x: u32, /* @x for which *perm is defined */
-    perm_n: u32, /* num elements of *perm that are permuted/defined */
-    perm: u32,
+    pub perm_n: u32, /* num elements of *perm that are permuted/defined */
+    pub perm: u32,
 }
 
 impl Bucket{
@@ -712,10 +711,10 @@ impl Bucket{
  * to generate the set of output devices.
  */
 #[derive(Debug, Eq, PartialEq)]
-struct CrushRuleStep {
-    op: u32,
-    arg1: i32,
-    arg2: i32,
+pub struct CrushRuleStep {
+    pub op: u32,
+    pub arg1: i32,
+    pub arg2: i32,
 }
 
 impl CrushRuleStep{
@@ -751,11 +750,11 @@ impl CrushRuleStep{
  * rule list for a matching rule_mask.
  */
 #[derive(Debug, Eq, PartialEq)]
-struct CrushRuleMask {
-    ruleset: u8,
-    rule_type: u8,
-    min_size: u8,
-    max_size: u8,
+pub struct CrushRuleMask {
+    pub ruleset: u8,
+    pub rule_type: u8,
+    pub min_size: u8,
+    pub max_size: u8,
 }
 
 impl CrushRuleMask{
@@ -789,10 +788,10 @@ impl CrushRuleMask{
 }
 
 #[derive(Debug, Eq, PartialEq)]
-struct Rule{
-    len: u32,
-    mask: CrushRuleMask,
-    steps: Vec<CrushRuleStep>,
+pub struct Rule{
+    pub len: u32,
+    pub mask: CrushRuleMask,
+    pub steps: Vec<CrushRuleStep>,
 }
 
 impl Rule{
@@ -844,42 +843,42 @@ impl Rule{
 }
 
 #[derive(Debug, Eq, PartialEq)]
-struct CrushMap {
-    magic: u32,
-    max_buckets: i32,
-    max_rules: u32,
-    max_devices: i32,
+pub struct CrushMap {
+    pub magic: u32,
+    pub max_buckets: i32,
+    pub max_rules: u32,
+    pub max_devices: i32,
 
-    buckets: Vec<BucketTypes>,
-    rules: Vec<Option<Rule>>,
+    pub buckets: Vec<BucketTypes>,
+    pub rules: Vec<Option<Rule>>,
 
-    type_map: Vec<(i32, String)>,
-    name_map: Vec<(i32, String)>,
-    rule_name_map: Vec<(i32, String)>,
+    pub type_map: Vec<(i32, String)>,
+    pub name_map: Vec<(i32, String)>,
+    pub rule_name_map: Vec<(i32, String)>,
 
     /* choose local retries before re-descent */
-    choose_local_tries: Option<u32>,
+    pub choose_local_tries: Option<u32>,
     /* choose local attempts using a fallback permutation before
      * re-descent */
-    choose_local_fallback_tries: Option<u32>,
+    pub choose_local_fallback_tries: Option<u32>,
     /* choose attempts before giving up */
-    choose_total_tries: Option<u32>,
+    pub choose_total_tries: Option<u32>,
     /* attempt chooseleaf inner descent once for firstn mode; on
      * reject retry outer descent.  Note that this does *not*
      * apply to a collision: in that case we will retry as we used
      * to. */
-    chooseleaf_descend_once: Option<u32>,
+    pub chooseleaf_descend_once: Option<u32>,
 
     /* if non-zero, feed r into chooseleaf, bit-shifted right by (r-1)
      * bits.  a value of 1 is best for new clusters.  for legacy clusters
      * that want to limit reshuffling, a value of 3 or 4 will make the
      * mappings line up a bit better with previous mappings. */
-    chooseleaf_vary_r: Option<u8>,
-    straw_calc_version: Option<u8>,
-    choose_tries: Option<u32>,
+    pub chooseleaf_vary_r: Option<u8>,
+    pub straw_calc_version: Option<u8>,
+    pub choose_tries: Option<u32>,
 }
 
-fn parse_crushmap<'a>(input: &'a [u8]) -> nom::IResult<&[u8], CrushMap>{
+pub fn parse_crushmap<'a>(input: &'a [u8]) -> nom::IResult<&[u8], CrushMap>{
     trace!("crushmap input: {:?}", input);
     chain!(
         input,
@@ -934,7 +933,7 @@ fn parse_crushmap<'a>(input: &'a [u8]) -> nom::IResult<&[u8], CrushMap>{
         }
     )
 }
-fn encode_crushmap(crushmap: CrushMap) -> Result<Vec<u8>, EncodingError>{
+pub fn encode_crushmap(crushmap: CrushMap) -> Result<Vec<u8>, EncodingError>{
     let mut buffer: Vec<u8> = Vec::new();
     try!(buffer.write_u32::<LittleEndian>(CRUSH_MAGIC));
 

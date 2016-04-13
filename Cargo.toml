@@ -1,12 +1,16 @@
 [package]
 name = "crushtool"
+description = "A library to encode and decode Ceph's crushmap"
 version = "0.1.0"
 authors = ["Chris Holcombe <xfactor973@gmail.com>"]
+repository = "https://github.com/cholcombe973/crushtool"
+license = "MIT"
 
 [dependencies]
-byteorder = "*"
-enum_primitive = "*"
-log = "*"
-nom = "*"
-num = "*"
-simple_logger = "*"
+byteorder = "~0.5"
+enum_primitive = "~0.1"
+log = "~0.3"
+nom = "1.2.2"
+num = "~0.1"
+simple_logger = "~0.4"
+
