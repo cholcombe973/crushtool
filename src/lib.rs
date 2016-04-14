@@ -984,7 +984,6 @@ pub fn decode_crushmap<'a>(input: &'a [u8]) ->Result<CrushMap, String>{
         nom::IResult::Done(unparsed_input, ref mut map) => {
             //Resolve the argument types
             update_rule_steps(&mut map.rules, &map.type_map);
-            //map.rules = updated_rules;
 
             //Resolve the item names
             update_buckets(&mut map.buckets, &map.name_map);
