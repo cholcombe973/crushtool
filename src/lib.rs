@@ -5,6 +5,7 @@ extern crate byteorder;
 #[macro_use] extern crate log;
 #[macro_use] extern crate nom;
 extern crate num;
+extern crate rustc_serialize;
 extern crate simple_logger;
 
 use std::io::{self, ErrorKind, Read};
@@ -13,6 +14,8 @@ use std::string::FromUtf8Error;
 use byteorder::{LittleEndian, WriteBytesExt};
 use num::FromPrimitive;
 use nom::{le_u8, le_u16, le_i32, le_u32};
+//use rustc_serialize::json;
+
 static CRUSH_MAGIC: u32 = 0x00010000;  /* for detecting algorithm revisions */
 
 #[test]
@@ -131,7 +134,6 @@ fn test_decode_crushmap() {
     };
     let result = decode_crushmap(&crushmap_compiled);
     println!("crushmap {:?}", result);
-    let x: &[u8] = &[];
     assert_eq!(Ok(expected_result), result);
 }
 
@@ -315,7 +317,7 @@ impl From<io::Error> for EncodingError {
  */
 enum_from_primitive!{
     #[repr(u8)]
-    #[derive(Debug, Clone, Eq, PartialEq)]
+    #[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
     pub enum BucketAlg{
         Uniform = 1,
         List = 2,
@@ -326,7 +328,7 @@ enum_from_primitive!{
 
 enum_from_primitive!{
     #[repr(u8)]
-    #[derive(Debug, Clone, Eq, PartialEq)]
+    #[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
     pub enum RuleType{
         Replicated = 1,
         Raid4 = 2, //NOTE: never implemented
@@ -337,7 +339,7 @@ enum_from_primitive!{
 /* step op codes */
 enum_from_primitive!{
     #[repr(u16)]
-    #[derive(Debug, Clone, Eq, PartialEq)]
+    #[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
     pub enum OpCode{
         Noop = 0,
         Take = 1,          /* arg1 = value to start with */
@@ -356,7 +358,7 @@ enum_from_primitive!{
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
 pub struct CrushBucketUniform {
     pub bucket: Bucket,
     pub item_weight: u32,  /* 16-bit fixed point; all items equally weighted */
@@ -377,16 +379,16 @@ impl CrushBucketUniform{
         )
     }
 
-    fn encode(&self) -> Result<Vec<u8>, EncodingError>{
+    fn compile(&self) -> Result<Vec<u8>, EncodingError>{
         let mut buffer: Vec<u8> = Vec::new();
-        buffer.extend(try!(self.bucket.encode()));
+        buffer.extend(try!(self.bucket.compile()));
         try!(buffer.write_u32::<LittleEndian>(self.item_weight));
 
         Ok(buffer)
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
 pub struct CrushBucketList {
     pub bucket: Bucket,
     pub item_weights: Vec<(u32, u32)>,  /* 16-bit fixed point */
@@ -410,9 +412,9 @@ impl CrushBucketList{
         )
     }
 
-    fn encode(&self) -> Result<Vec<u8>, EncodingError>{
+    fn compile(&self) -> Result<Vec<u8>, EncodingError>{
         let mut buffer: Vec<u8> = Vec::new();
-        buffer.extend(try!(self.bucket.encode()));
+        buffer.extend(try!(self.bucket.compile()));
 
         for weights in self.item_weights.iter(){
             try!(buffer.write_u32::<LittleEndian>(weights.0));
@@ -423,7 +425,7 @@ impl CrushBucketList{
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
 pub struct CrushBucketTree {
     /* note: h.size is _tree_ size, not number of
            actual items */
@@ -448,9 +450,9 @@ impl CrushBucketTree{
             }
         )
     }
-    fn encode(&self) -> Result<Vec<u8>, EncodingError>{
+    fn compile(&self) -> Result<Vec<u8>, EncodingError>{
         let mut buffer: Vec<u8> = Vec::new();
-        buffer.extend(try!(self.bucket.encode()));
+        buffer.extend(try!(self.bucket.compile()));
 
         try!(buffer.write_u8(self.num_nodes));
 
@@ -462,7 +464,7 @@ impl CrushBucketTree{
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
 pub struct CrushBucketStraw {
     pub bucket: Bucket,
     pub item_weights: Vec<(u32, u32)>,   /* 16-bit fixed point */
@@ -485,9 +487,9 @@ impl CrushBucketStraw{
             }
         )
     }
-    fn encode(&self) -> Result<Vec<u8>, EncodingError>{
+    fn compile(&self) -> Result<Vec<u8>, EncodingError>{
         let mut buffer: Vec<u8> = Vec::new();
-        buffer.extend(try!(self.bucket.encode()));
+        buffer.extend(try!(self.bucket.compile()));
 
         for weights in self.item_weights.iter(){
             try!(buffer.write_u32::<LittleEndian>(weights.0));
@@ -498,7 +500,7 @@ impl CrushBucketStraw{
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
 pub enum BucketTypes{
     Uniform(CrushBucketUniform),
     List(CrushBucketList),
@@ -658,7 +660,7 @@ fn parse_bucket<'a>(input: &'a [u8]) -> nom::IResult<&[u8], BucketTypes>{
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
 pub struct Bucket{
     pub struct_size: u32,
     pub id: i32,          /* this'll be negative */
@@ -713,7 +715,7 @@ impl Bucket{
             }
         )
     }
-    fn encode(&self) -> Result<Vec<u8>, EncodingError>{
+    fn compile(&self) -> Result<Vec<u8>, EncodingError>{
         let mut buffer: Vec<u8> = Vec::new();
         try!(buffer.write_u32::<LittleEndian>(self.struct_size));
         try!(buffer.write_i32::<LittleEndian>(self.id));
@@ -754,7 +756,7 @@ impl Bucket{
  * mapped to devices.  A rule consists of sequence of steps to perform
  * to generate the set of output devices.
  */
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
 pub struct CrushRuleStep {
     pub op: OpCode,
     pub arg1: (i32, Option<String>),
@@ -792,7 +794,7 @@ impl CrushRuleStep{
             }
         }
     }
-    fn encode(&self) -> Result<Vec<u8>, EncodingError>{
+    fn compile(&self) -> Result<Vec<u8>, EncodingError>{
         let mut buffer: Vec<u8> = Vec::new();
         try!(buffer.write_u32::<LittleEndian>(self.op.clone() as u32));
         try!(buffer.write_i32::<LittleEndian>(self.arg1.0));
@@ -807,7 +809,7 @@ impl CrushRuleStep{
  * Given a ruleset and size of output set, we search through the
  * rule list for a matching rule_mask.
  */
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
 pub struct CrushRuleMask {
     pub ruleset: u8,
     pub rule_type: RuleType,
@@ -835,7 +837,7 @@ impl CrushRuleMask{
             }
         )
     }
-    fn encode(&self) -> Result<Vec<u8>, EncodingError>{
+    fn compile(&self) -> Result<Vec<u8>, EncodingError>{
         let mut buffer: Vec<u8> = Vec::new();
         try!(buffer.write_u8(self.ruleset));
         try!(buffer.write_u8(self.rule_type.clone() as u8));
@@ -846,7 +848,7 @@ impl CrushRuleMask{
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
 pub struct Rule{
     pub len: u32,
     pub mask: CrushRuleMask,
@@ -885,16 +887,16 @@ impl Rule{
             },
         }
     }
-    fn encode(&self) -> Result<Vec<u8>, EncodingError>{
+    fn compile(&self) -> Result<Vec<u8>, EncodingError>{
         let mut buffer: Vec<u8> = Vec::new();
         //YES
         try!(buffer.write_u32::<LittleEndian>(1));
 
         try!(buffer.write_u32::<LittleEndian>(self.len));
-        buffer.extend(try!(self.mask.encode()));
+        buffer.extend(try!(self.mask.compile()));
         //Steps length
         for step in self.steps.iter(){
-            buffer.extend(try!(step.encode()));
+            buffer.extend(try!(step.compile()));
         }
 
         Ok(buffer)
@@ -942,7 +944,7 @@ fn update_buckets<'a>(crush_buckets: &'a mut Vec<BucketTypes>, name_map: &Vec<(i
     crush_buckets
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
 pub struct CrushMap {
     pub magic: u32,
     pub max_buckets: i32,
@@ -981,7 +983,7 @@ pub struct CrushMap {
 pub fn decode_crushmap<'a>(input: &'a [u8]) ->Result<CrushMap, String>{
     let mut result = parse_crushmap(input);
     match result{
-        nom::IResult::Done(unparsed_input, ref mut map) => {
+        nom::IResult::Done(_, ref mut map) => {
             //Resolve the argument types
             update_rule_steps(&mut map.rules, &map.type_map);
 
@@ -991,10 +993,10 @@ pub fn decode_crushmap<'a>(input: &'a [u8]) ->Result<CrushMap, String>{
             //TODO: Can we get rid of this clone?
             return Ok(map.clone());
         },
-        nom::IResult::Error(e) => {
+        nom::IResult::Error(_) => {
             Err("parsing error".to_string())
         },
-        nom::IResult::Incomplete(needed) => {
+        nom::IResult::Incomplete(_) => {
             Err("Incomplete".to_string())
         },
     }
@@ -1067,19 +1069,19 @@ pub fn encode_crushmap(crushmap: CrushMap) -> Result<Vec<u8>, EncodingError>{
         match bucket{
             &BucketTypes::Uniform(ref uniform) =>{
                 trace!("Trying to encode uniform bucket");
-                buffer.extend(try!(uniform.encode()));
+                buffer.extend(try!(uniform.compile()));
             },
             &BucketTypes::List(ref list) => {
                 trace!("Trying to encode list bucket");
-                buffer.extend(try!(list.encode()));
+                buffer.extend(try!(list.compile()));
             },
             &BucketTypes::Tree(ref tree) => {
                 trace!("Trying to encode tree bucket");
-                buffer.extend(try!(tree.encode()));
+                buffer.extend(try!(tree.compile()));
             },
             &BucketTypes::Straw(ref straw) => {
                 trace!("Trying to encode straw bucket");
-                buffer.extend(try!(straw.encode()));
+                buffer.extend(try!(straw.compile()));
             },
             &BucketTypes::Unknown => {
                 try!(buffer.write_u32::<LittleEndian>(0));
@@ -1090,7 +1092,7 @@ pub fn encode_crushmap(crushmap: CrushMap) -> Result<Vec<u8>, EncodingError>{
     for rule in crushmap.rules.into_iter(){
         if rule.is_some(){
             let unwrapped_rule = rule.unwrap();
-            buffer.extend(try!(unwrapped_rule.encode()));
+            buffer.extend(try!(unwrapped_rule.compile()));
         }else{
             //yes bits == 0
             try!(buffer.write_u32::<LittleEndian>(0));
@@ -1126,7 +1128,6 @@ pub fn encode_crushmap(crushmap: CrushMap) -> Result<Vec<u8>, EncodingError>{
 }
 
 fn main() {
-    // simple_logger::init_with_level(log::LogLevel::Trace).unwrap();
     simple_logger::init_with_level(log::LogLevel::Warn).unwrap();
     let mut buffer: Vec<u8> = vec![];
     match io::stdin().read_to_end(&mut buffer) {

@@ -1,7 +1,7 @@
 [package]
 name = "crushtool"
 description = "A library to encode and decode Ceph's crushmap"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["Chris Holcombe <xfactor973@gmail.com>"]
 repository = "https://github.com/cholcombe973/crushtool"
 license = "MIT"
@@ -12,5 +12,5 @@ enum_primitive = "~0.1"
 log = "~0.3"
 nom = "1.2.2"
 num = "~0.1"
+rustc-serialize = "~0.3"
 simple_logger = "~0.4"
-
