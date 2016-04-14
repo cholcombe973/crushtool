@@ -72,17 +72,21 @@ fn test_decode_crushmap() {
                         hash: 0,
                         weight: 0,
                         size: 3,
-                        items: vec![-2, -3, -4],
+                        items: vec![
+                            (-2, Some("ip-172-31-43-147".to_string())),
+                            (-3, Some("ip-172-31-22-2".to_string())),
+                            (-4, Some("ip-172-31-4-56".to_string()))
+                        ],
                         perm_n: 0,
                         perm: 3
                     },
                     item_weights: vec![(0, 0), (0, 0), (0, 0)] }),
             BucketTypes::Straw(CrushBucketStraw {
-                bucket: Bucket { id: -2, struct_size: 4, bucket_type: OpCode::Take, alg: BucketAlg::Straw, hash: 0, weight: 0, size: 1, items: vec![0], perm_n: 0, perm: 1 }, item_weights: vec![(0, 0)] }),
+                bucket: Bucket { id: -2, struct_size: 4, bucket_type: OpCode::Take, alg: BucketAlg::Straw, hash: 0, weight: 0, size: 1, items: vec![(0, Some("osd.0".to_string()))], perm_n: 0, perm: 1 }, item_weights: vec![(0, 0)] }),
             BucketTypes::Straw(CrushBucketStraw {
-                bucket: Bucket { id: -3, struct_size: 4, bucket_type: OpCode::Take, alg: BucketAlg::Straw, hash: 0, weight: 0, size: 1, items: vec![1], perm_n: 0, perm: 1 }, item_weights: vec![(0, 0)] }),
+                bucket: Bucket { id: -3, struct_size: 4, bucket_type: OpCode::Take, alg: BucketAlg::Straw, hash: 0, weight: 0, size: 1, items: vec![(1, Some("osd.1".to_string()))], perm_n: 0, perm: 1 }, item_weights: vec![(0, 0)] }),
             BucketTypes::Straw(CrushBucketStraw {
-                bucket: Bucket { id: -4, struct_size: 4, bucket_type: OpCode::Take, alg: BucketAlg::Straw, hash: 0, weight: 0, size: 1, items: vec![2], perm_n: 0, perm: 1 }, item_weights: vec![(0, 0)] }),
+                bucket: Bucket { id: -4, struct_size: 4, bucket_type: OpCode::Take, alg: BucketAlg::Straw, hash: 0, weight: 0, size: 1, items: vec![(2, Some("osd.2".to_string()))], perm_n: 0, perm: 1 }, item_weights: vec![(0, 0)] }),
             BucketTypes::Unknown, BucketTypes::Unknown, BucketTypes::Unknown, BucketTypes::Unknown],
         rules: vec![
             Some(
@@ -186,17 +190,21 @@ fn test_encode_crushmap() {
                         hash: 0,
                         weight: 0,
                         size: 3,
-                        items: vec![-2, -3, -4],
+                        items: vec![
+                            (-2, Some("ip-172-31-43-147".to_string())),
+                            (-3, Some("ip-172-31-22-2".to_string())),
+                            (-4, Some("ip-172-31-4-56".to_string()))
+                        ],
                         perm_n: 0,
                         perm: 3
                     },
                     item_weights: vec![(0, 0), (0, 0), (0, 0)] }),
             BucketTypes::Straw(CrushBucketStraw {
-                bucket: Bucket { id: -2, struct_size: 4, bucket_type: OpCode::Take, alg: BucketAlg::Straw, hash: 0, weight: 0, size: 1, items: vec![0], perm_n: 0, perm: 1 }, item_weights: vec![(0, 0)] }),
+                bucket: Bucket { id: -2, struct_size: 4, bucket_type: OpCode::Take, alg: BucketAlg::Straw, hash: 0, weight: 0, size: 1, items: vec![(0, Some("osd.0".to_string()))], perm_n: 0, perm: 1 }, item_weights: vec![(0, 0)] }),
             BucketTypes::Straw(CrushBucketStraw {
-                bucket: Bucket { id: -3, struct_size: 4, bucket_type: OpCode::Take, alg: BucketAlg::Straw, hash: 0, weight: 0, size: 1, items: vec![1], perm_n: 0, perm: 1 }, item_weights: vec![(0, 0)] }),
+                bucket: Bucket { id: -3, struct_size: 4, bucket_type: OpCode::Take, alg: BucketAlg::Straw, hash: 0, weight: 0, size: 1, items: vec![(1, Some("osd.1".to_string()))], perm_n: 0, perm: 1 }, item_weights: vec![(0, 0)] }),
             BucketTypes::Straw(CrushBucketStraw {
-                bucket: Bucket { id: -4, struct_size: 4, bucket_type: OpCode::Take, alg: BucketAlg::Straw, hash: 0, weight: 0, size: 1, items: vec![2], perm_n: 0, perm: 1 }, item_weights: vec![(0, 0)] }),
+                bucket: Bucket { id: -4, struct_size: 4, bucket_type: OpCode::Take, alg: BucketAlg::Straw, hash: 0, weight: 0, size: 1, items: vec![(2, Some("osd.2".to_string()))], perm_n: 0, perm: 1 }, item_weights: vec![(0, 0)] }),
             BucketTypes::Unknown, BucketTypes::Unknown, BucketTypes::Unknown, BucketTypes::Unknown],
         rules: vec![
             Some(
@@ -510,6 +518,13 @@ named!(decode_32_or_64<&[u8], u32>,
     )
 );
 
+//This silly fucntion is needed because we don't know the name_map while
+//parsing the crush buckets. Only after we're finished parsing the crushmap
+//do we know the names
+fn none(input: &[u8])->nom::IResult<&[u8], Option<String>>{
+    nom::IResult::Done(input, None)
+}
+
 fn try_le_u8(input: &[u8]) ->nom::IResult<&[u8], Option<u8>>{
     if input.len() == 0{
         nom::IResult::Done(input, None)
@@ -652,7 +667,7 @@ pub struct Bucket{
     pub hash: u8,         /* which hash function to use, CRUSH_HASH_* */
     pub weight: u32,      /* 16-bit fixed point */
     pub size: u32,        /* num items */
-    pub items: Vec<i32>,
+    pub items: Vec<(i32, Option<String>)>,
     /*
      * cached random permutation: used for uniform bucket and for
      * the linear search fallback for the other bucket types.
@@ -677,7 +692,11 @@ impl Bucket{
             hash: le_u8~
             weight: le_u32~
             size: le_u32~
-            items: dbg!(count!(le_i32, size as usize)),
+            items: dbg!(
+                count!(
+                    pair!(le_i32, call!(none)), size as usize
+                )
+            ),
             ||{
                 Bucket{
                     struct_size: struct_size,
@@ -705,10 +724,28 @@ impl Bucket{
         try!(buffer.write_u32::<LittleEndian>(self.size));
 
         for item in self.items.iter(){
-            try!(buffer.write_i32::<LittleEndian>(*item));
+            try!(buffer.write_i32::<LittleEndian>(item.0));
         }
 
         Ok(buffer)
+    }
+
+    fn update_name_mapping(&mut self, name_map: &Vec<(i32, String)>){
+        trace!("Updating name mapping with {:?}", name_map);
+        let mut new_items: Vec<(i32, Option<String>)> = Vec::with_capacity(self.items.len());
+
+        //I want to preserve the vec ordering
+        for item_tuple in self.items.iter_mut(){
+            let mut resolved_item: (i32, Option<String>) = (item_tuple.0, None);
+
+            for name in name_map{
+                if name.0 == item_tuple.0{
+                    resolved_item.1 = Some(name.1.clone());
+                }
+            }
+            new_items.push(resolved_item);
+        }
+        self.items = new_items;
     }
 }
 
@@ -745,7 +782,7 @@ impl CrushRuleStep{
     }
     //Change the arg's.1 from None to a proper name
     fn update_arg_mapping(&mut self, type_map: &Vec<(i32, String)>){
-        println!("Updating arg mapping with {:?}", type_map);
+        trace!("Updating arg mapping with {:?}", type_map);
         for tuple in type_map{
             if tuple.0 == self.arg1.0{
                 self.arg1.1 = Some(tuple.1.clone());
@@ -866,25 +903,43 @@ impl Rule{
 
 //Try to update the CrushRuleStep's now that we know the type_map.  I wish Ceph
 //had included the type_map first in the compiled crush so I could skip this workaround.
-fn update_rule_steps(rules: &mut Vec<Option<Rule>>,
-                   type_map: &Vec<(i32, String)>)->Vec<Option<Rule>>{
-    let mut updated_rules:Vec<Option<Rule>> = Vec::new();
-
+fn update_rule_steps<'a>(rules: &'a mut Vec<Option<Rule>>,
+                   type_map: &Vec<(i32, String)>)->&'a mut Vec<Option<Rule>>{
     for rule in rules.iter_mut(){
         match *rule{
             Some(ref mut r) => {
                 for step in r.steps.iter_mut(){
                     step.update_arg_mapping(type_map)
                 }
-                updated_rules.push(Some(r.clone()));
             }
             None => {
                 //Skip None's
-                updated_rules.push(None);
             }
         }
     }
-    updated_rules
+    rules
+}
+
+fn update_buckets<'a>(crush_buckets: &'a mut Vec<BucketTypes>, name_map: &Vec<(i32, String)>) -> &'a mut Vec<BucketTypes>{
+    for crush_bucket in crush_buckets.iter_mut(){
+        match *crush_bucket{
+            BucketTypes::Uniform(ref mut uniform) => {
+                uniform.bucket.update_name_mapping(name_map);
+            },
+            BucketTypes::List(ref mut list) => {
+                list.bucket.update_name_mapping(name_map);
+            },
+            BucketTypes::Tree(ref mut tree) => {
+                tree.bucket.update_name_mapping(name_map);
+            },
+            BucketTypes::Straw(ref mut straw) =>{
+                straw.bucket.update_name_mapping(name_map);
+            },
+            BucketTypes::Unknown => {
+            }
+        }
+    }
+    crush_buckets
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -927,8 +982,13 @@ pub fn decode_crushmap<'a>(input: &'a [u8]) ->Result<CrushMap, String>{
     let mut result = parse_crushmap(input);
     match result{
         nom::IResult::Done(unparsed_input, ref mut map) => {
-            let updated_rules = update_rule_steps(&mut map.rules, &map.type_map);
-            map.rules = updated_rules;
+            //Resolve the argument types
+            update_rule_steps(&mut map.rules, &map.type_map);
+            //map.rules = updated_rules;
+
+            //Resolve the item names
+            update_buckets(&mut map.buckets, &map.name_map);
+
             //TODO: Can we get rid of this clone?
             return Ok(map.clone());
         },
@@ -1064,10 +1124,6 @@ pub fn encode_crushmap(crushmap: CrushMap) -> Result<Vec<u8>, EncodingError>{
     }
 
     Ok(buffer)
-}
-
-pub fn get_failure_domain_for_rule(rule_number: u32){
-
 }
 
 fn main() {
