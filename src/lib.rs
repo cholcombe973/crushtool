@@ -1133,7 +1133,6 @@ pub fn encode_crushmap(crushmap: CrushMap) -> Result<Vec<u8>, EncodingError>{
 }
 
 fn main() {
-<<<<<<< HEAD:src/main.rs
     let matches = App::new("crushtool")
         .version(crate_version!())
         .arg(Arg::with_name("verbose")
