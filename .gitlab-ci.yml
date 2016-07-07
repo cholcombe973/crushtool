@@ -5,25 +5,27 @@ cache:
   paths:
     - $HOME/.cargo
 
+variables:
+  TRAVIS_CARGO_NIGHTLY_FEATURE: ""
+
 stages:
   - test
 
 test-stable:
   script:
     - curl -sSf https://static.rust-lang.org/rustup.sh | sh -s -- -y --disable-sudo
-    - cargo build --release --verbose
-    - cargo test --verbose
+    - travis-cargo build && travis-cargo test
+    - travis-cargo coverage --no-sudo || true
+    - cat target/kcov*/index.json || true
 
 test-beta:
   allow_failure: true
   script:
     - curl -sSf https://static.rust-lang.org/rustup.sh | sh -s -- -y --disable-sudo --channel=beta
-    - cargo build --release --verbose
-    - cargo test --verbose
+    - travis-cargo build && travis-cargo test
 
 test-nightly:
   allow_failure: true
   script:
     - curl -sSf https://static.rust-lang.org/rustup.sh | sh -s -- -y --disable-sudo --channel=nightly
-    - cargo build --release --verbose
-    - cargo test --verbose
+    - travis-cargo build && travis-cargo test
