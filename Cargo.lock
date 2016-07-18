@@ -4,6 +4,7 @@ version = "0.3.1"
 dependencies = [
  "byteorder 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap 2.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ego-tree 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "enum_primitive 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "nom 1.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -39,6 +40,11 @@ dependencies = [
  "unicode-width 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "vec_map 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
+
+[[package]]
+name = "ego-tree"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "enum_primitive"
