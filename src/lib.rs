@@ -713,7 +713,7 @@ pub fn add_bucket(crushmap: &mut CrushMap) {}
 /// Remove a bucket from the crushmap
 pub fn remove_bucket(crushmap: &mut CrushMap) {}
 
-fn populate_tree(crushmap: &Vec<BucketTypes>, tree: &mut ego_tree::NodeMut<BucketTypes>) {
+fn populate_tree(crushmap: &Vec<BucketTypes>, tree: ego_tree::NodeMut<BucketTypes>) {
     // root.append('b');
     // let mut c = root.append('c');
     // c.append('d');
@@ -722,18 +722,15 @@ fn populate_tree(crushmap: &Vec<BucketTypes>, tree: &mut ego_tree::NodeMut<Bucke
 
 /// Decompile the crushmap and return an ego_tree
 /// TODO: some information may be lost like magic, and other top level crap.
-pub fn decode_as_tree<'a>(input: &[u8]) -> Result<&'a Tree<BucketTypes>, String> {
+pub fn decode_as_tree<'a>(input: &'a [u8]) -> Result<Tree<BucketTypes>, String> {
     let mut decoded = try!(decode_crushmap(input));
 
     if let Some(root) = decoded.buckets.pop() {
         // The default bucket should be here
         let mut crushtree = Tree::new(root);
+        populate_tree(&decoded.buckets, crushtree.root_mut());
 
-        let mut root = crushtree.root_mut();
-        populate_tree(&decoded.buckets, &mut root);
-
-        let ref crushtree_copy = crushtree;
-        Ok(crushtree_copy)
+        Ok(crushtree)
     } else {
         // Unable to pop the root off the list.  Fail
         Err("Unable to find default bucket".to_string())
