@@ -463,6 +463,10 @@ impl Bucket {
                 )
             ),
             ||{
+                //Ceph stores weights as u32 but displays them as f32 with
+                //rounding.
+                //let floating_weight: f32 =  weight as f32 / 0x10000 as f32;
+                //trace!("Floating weight: {}", floating_weight);
                 Bucket{
                     struct_size: struct_size,
                     id: id,
@@ -713,7 +717,10 @@ pub fn add_bucket(crushmap: &mut CrushMap) {}
 /// Remove a bucket from the crushmap
 pub fn remove_bucket(crushmap: &mut CrushMap) {}
 
-fn populate_tree(crushmap: &Vec<BucketTypes>, tree: ego_tree::NodeMut<BucketTypes>) {
+fn populate_tree(crush_buckets: &Vec<BucketTypes>, tree: ego_tree::NodeMut<BucketTypes>) {
+    for bucket in crush_buckets {
+
+    }
     // root.append('b');
     // let mut c = root.append('c');
     // c.append('d');
@@ -722,7 +729,7 @@ fn populate_tree(crushmap: &Vec<BucketTypes>, tree: ego_tree::NodeMut<BucketType
 
 /// Decompile the crushmap and return an ego_tree
 /// TODO: some information may be lost like magic, and other top level crap.
-pub fn decode_as_tree<'a>(input: &'a [u8]) -> Result<Tree<BucketTypes>, String> {
+pub fn decode_as_tree(input: &[u8]) -> Result<Tree<BucketTypes>, String> {
     let mut decoded = try!(decode_crushmap(input));
 
     if let Some(root) = decoded.buckets.pop() {
