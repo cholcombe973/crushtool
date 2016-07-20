@@ -88,6 +88,7 @@ enum_from_primitive!{
         List = 2,
         Tree = 3,
         Straw = 4,
+        Straw2 = 5,
     }
 }
 
@@ -261,6 +262,37 @@ impl CrushBucketStraw {
         Ok(buffer)
     }
 }
+#[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
+pub struct CrushBucketStraw2 {
+    pub bucket: Bucket,
+    pub item_weights: Vec<u32>,
+}
+
+impl CrushBucketStraw2 {
+    fn parse<'a>(input: &'a [u8]) -> nom::IResult<&[u8], Self> {
+        chain!(
+            input,
+            bucket: call!(Bucket::parse)~
+            item_weights: count!(le_u32, bucket.size as usize),
+            ||{
+                CrushBucketStraw2{
+                    bucket: bucket,
+                    item_weights: item_weights,
+                }
+            }
+        )
+    }
+    fn compile(&self) -> Result<Vec<u8>, EncodingError> {
+        let mut buffer: Vec<u8> = Vec::new();
+        buffer.extend(try!(self.bucket.compile()));
+
+        for weight in self.item_weights.iter() {
+            try!(buffer.write_u32::<LittleEndian>(*weight));
+        }
+
+        Ok(buffer)
+    }
+}
 
 #[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
 pub enum BucketTypes {
@@ -268,6 +300,7 @@ pub enum BucketTypes {
     List(CrushBucketList),
     Tree(CrushBucketTree),
     Straw(CrushBucketStraw),
+    Straw2(CrushBucketStraw2),
     Unknown,
 }
 
@@ -411,6 +444,16 @@ fn parse_bucket<'a>(input: &'a [u8]) -> nom::IResult<&[u8], BucketTypes> {
                         }
                     )
                 }
+                BucketAlg::Straw2 => {
+                    trace!("Trying to decode straw2 bucket");
+                    chain!(
+                        input,
+                        straw_bucket: dbg!(call!(CrushBucketStraw2::parse)),
+                        ||{
+                            BucketTypes::Straw2(straw_bucket)
+                        }
+                    )
+                }
             }
         }
         nom::IResult::Incomplete(needed) => {
@@ -504,8 +547,11 @@ impl Bucket {
             for name in name_map {
                 if name.0 == item_tuple.0 {
                     resolved_item.1 = Some(name.1.clone());
+                    trace!("Found item: {:?}", name.1);
+                    break;
                 }
             }
+            trace!("Adding resolved item: {:?}", resolved_item);
             new_items.push(resolved_item);
         }
         self.items = new_items;
@@ -699,6 +745,9 @@ fn update_buckets<'a>(crush_buckets: &'a mut Vec<BucketTypes>,
             BucketTypes::Straw(ref mut straw) => {
                 straw.bucket.update_name_mapping(name_map);
             }
+            BucketTypes::Straw2(ref mut straw2) => {
+                straw2.bucket.update_name_mapping(name_map);
+            }
             BucketTypes::Unknown => {}
         }
     }
@@ -840,6 +889,10 @@ pub fn encode_crushmap(crushmap: CrushMap) -> Result<Vec<u8>, EncodingError> {
                 trace!("Trying to encode straw bucket");
                 buffer.extend(try!(straw.compile()));
             }
+            &BucketTypes::Straw2(ref straw2) => {
+                trace!("Trying to encode straw2 bucket");
+                buffer.extend(try!(straw2.compile()));
+            }
             &BucketTypes::Unknown => {
                 try!(buffer.write_u32::<LittleEndian>(0));
             }
@@ -921,8 +974,8 @@ fn main() {
     let input: &[u8] = &buffer.as_slice();
 
     if matches.is_present("decompile") {
-        let result: CrushMap = match parse_crushmap(&input) {
-            nom::IResult::Done(_, r) => r,
+        let result: CrushMap = match decode_crushmap(&input) {
+            Ok(r) => r,
             _ => panic!("There was a problem parsing the crushmap"),
         };
         if result.magic != CRUSH_MAGIC {
