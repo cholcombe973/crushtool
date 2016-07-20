@@ -3,6 +3,7 @@
 extern crate byteorder;
 #[macro_use]
 extern crate clap;
+extern crate ego_tree;
 #[macro_use]
 extern crate enum_primitive;
 #[macro_use]
@@ -18,6 +19,7 @@ use std::string::FromUtf8Error;
 
 use byteorder::{LittleEndian, WriteBytesExt};
 use clap::{Arg, ArgGroup, App};
+use ego_tree::Tree;
 use num::FromPrimitive;
 use nom::{le_u8, le_u16, le_i32, le_u32};
 // use rustc_serialize::json;
@@ -461,6 +463,10 @@ impl Bucket {
                 )
             ),
             ||{
+                //Ceph stores weights as u32 but displays them as f32 with
+                //rounding.
+                //let floating_weight: f32 =  weight as f32 / 0x10000 as f32;
+                //trace!("Floating weight: {}", floating_weight);
                 Bucket{
                     struct_size: struct_size,
                     id: id,
@@ -703,6 +709,45 @@ fn update_buckets<'a>(crush_buckets: &'a mut Vec<BucketTypes>,
         }
     }
     crush_buckets
+}
+
+/// Creates a new bucket in the crushmap
+pub fn add_bucket(crushmap: &mut CrushMap) {}
+
+/// Remove a bucket from the crushmap
+pub fn remove_bucket(crushmap: &mut CrushMap) {}
+
+fn populate_tree(crush_buckets: &Vec<BucketTypes>, tree: ego_tree::NodeMut<BucketTypes>) {
+    for bucket in crush_buckets {
+
+    }
+    // root.append('b');
+    // let mut c = root.append('c');
+    // c.append('d');
+    // c.append('e');
+}
+
+/// Decompile the crushmap and return an ego_tree
+/// TODO: some information may be lost like magic, and other top level crap.
+pub fn decode_as_tree(input: &[u8]) -> Result<Tree<BucketTypes>, String> {
+    let mut decoded = try!(decode_crushmap(input));
+
+    if let Some(root) = decoded.buckets.pop() {
+        // The default bucket should be here
+        let mut crushtree = Tree::new(root);
+        populate_tree(&decoded.buckets, crushtree.root_mut());
+
+        Ok(crushtree)
+    } else {
+        // Unable to pop the root off the list.  Fail
+        Err("Unable to find default bucket".to_string())
+    }
+}
+
+/// Returns the next integer for all buckets except BucketTypes::Osd
+pub fn get_next_index() -> i32 {
+    // return next smaller integer
+    0
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
