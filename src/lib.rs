@@ -2,8 +2,6 @@
 //
 extern crate byteorder;
 #[macro_use]
-extern crate clap;
-#[macro_use]
 extern crate enum_primitive;
 #[macro_use]
 extern crate log;
@@ -11,13 +9,11 @@ extern crate log;
 extern crate nom;
 extern crate num;
 extern crate rustc_serialize;
-extern crate simple_logger;
 
-use std::io::{self, ErrorKind, Read};
+use std::io::{self, ErrorKind};
 use std::string::FromUtf8Error;
 
 use byteorder::{LittleEndian, WriteBytesExt};
-use clap::{Arg, ArgGroup, App};
 use num::FromPrimitive;
 use nom::{le_u8, le_u16, le_i32, le_u32};
 // use rustc_serialize::json;
@@ -882,54 +878,4 @@ pub fn encode_crushmap(crushmap: CrushMap) -> Result<Vec<u8>, EncodingError> {
     }
 
     Ok(buffer)
-}
-
-fn main() {
-    let matches = App::new("crushtool")
-        .version(crate_version!())
-        .arg(Arg::with_name("verbose")
-            .short("v")
-            .multiple(true)
-            .help("Sets the level of debugging information"))
-        .arg(Arg::with_name("decompile")
-            .short("d")
-            .help("Decompile a crush map")
-            .conflicts_with("compile"))
-        .arg(Arg::with_name("compile")
-            .short("c")
-            .help("Compile a crush map")
-            .conflicts_with("decompile"))
-        .group(ArgGroup::with_name("mode")
-            .required(true)
-            .args(&["compile", "decompile"]))
-        .get_matches();
-    let log_level = match matches.occurrences_of("verbose") {
-        0 => log::LogLevel::Warn,
-        1 => log::LogLevel::Info,
-        2 => log::LogLevel::Debug,
-        3 | _ => log::LogLevel::Trace,
-    };
-
-    simple_logger::init_with_level(log::LogLevel::Warn).unwrap();
-
-    let mut buffer: Vec<u8> = vec![];
-    match io::stdin().read_to_end(&mut buffer) {
-        Ok(_) => trace!("Read input from STDIN"),
-        Err(e) => trace!("Failed to read STDIN: {:?}", e),
-    };
-
-    let input: &[u8] = &buffer.as_slice();
-
-    if matches.is_present("decompile") {
-        let result: CrushMap = match parse_crushmap(&input) {
-            nom::IResult::Done(_, r) => r,
-            _ => panic!("There was a problem parsing the crushmap"),
-        };
-        if result.magic != CRUSH_MAGIC {
-            panic!("Could not decompile crushmap");
-        }
-        println!("{:?}", result);
-    } else if matches.is_present("compile") {
-        println!("Coming soon!");
-    }
 }
