@@ -97,6 +97,14 @@ enum_from_primitive!{
     }
 }
 
+enum_from_primitive!{
+    #[repr(u8)]
+    #[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
+    pub enum CrushHash{
+        RJenkins1 = 0,
+    }
+}
+
 // step op codes
 enum_from_primitive!{
     #[repr(u16)]
@@ -427,16 +435,16 @@ fn parse_bucket<'a>(input: &'a [u8]) -> nom::IResult<&[u8], BucketTypes> {
 #[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
 pub struct Bucket {
     pub struct_size: u32,
-    pub id: i32,
     /// this'll be negative
-    pub bucket_type: OpCode,
+    pub id: i32,
     /// non-zero; type=0 is reserved for devices
+    pub bucket_type: OpCode,
+    /// Which algorithm to use
     pub alg: BucketAlg,
-    /// one of CRUSH_BUCKET_*
-    pub hash: u8,
-    /// which hash function to use, CRUSH_HASH_*
-    pub weight: u32,
+    /// which hash function to use
+    pub hash: CrushHash,
     /// 16-bit fixed point
+    pub weight: u32,
     pub size: u32,
     /// num items
     pub items: Vec<(i32, Option<String>)>,
@@ -461,7 +469,8 @@ impl Bucket {
             bucket_type: expr_opt!(OpCode::from_u16(bucket_type_bits)) ~
             alg_bits: le_u8~
             alg: expr_opt!(BucketAlg::from_u8(alg_bits))~
-            hash: le_u8~
+            hash_bits: le_u8~
+            hash: expr_opt!(CrushHash::from_u8(hash_bits))~
             weight: le_u32~
             size: le_u32~
             items: dbg!(
@@ -491,7 +500,7 @@ impl Bucket {
         try!(buffer.write_i32::<LittleEndian>(self.id));
         try!(buffer.write_u16::<LittleEndian>(self.bucket_type.clone() as u16));
         try!(buffer.write_u8(self.alg.clone() as u8));
-        try!(buffer.write_u8(self.hash));
+        try!(buffer.write_u8(self.hash.clone() as u8));
         try!(buffer.write_u32::<LittleEndian>(self.weight));
         try!(buffer.write_u32::<LittleEndian>(self.size));
 

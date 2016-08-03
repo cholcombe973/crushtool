@@ -1,7 +1,7 @@
 extern crate nom;
 extern crate crushtool;
 use crushtool::{CrushMap, BucketTypes, CrushBucketStraw, OpCode, BucketAlg, CrushRuleStep, Bucket,
-                CrushRuleMask, Rule, RuleType, decode_crushmap, encode_crushmap};
+                CrushRuleMask, CrushHash, Rule, RuleType, decode_crushmap, encode_crushmap};
 
 #[test]
 fn test_decode_crushmap() {
@@ -59,7 +59,7 @@ fn test_decode_crushmap() {
                               id: -1,
                               bucket_type: OpCode::SetChooseLocalTries,
                               alg: BucketAlg::Straw,
-                              hash: 0,
+                              hash: CrushHash::RJenkins1,
                               weight: 0,
                               size: 3,
                               items: vec![(-2, Some("ip-172-31-43-147".to_string())),
@@ -76,7 +76,7 @@ fn test_decode_crushmap() {
                               struct_size: 4,
                               bucket_type: OpCode::Take,
                               alg: BucketAlg::Straw,
-                              hash: 0,
+                              hash: CrushHash::RJenkins1,
                               weight: 0,
                               size: 1,
                               items: vec![(0, Some("osd.0".to_string()))],
@@ -91,7 +91,7 @@ fn test_decode_crushmap() {
                               struct_size: 4,
                               bucket_type: OpCode::Take,
                               alg: BucketAlg::Straw,
-                              hash: 0,
+                              hash: CrushHash::RJenkins1,
                               weight: 0,
                               size: 1,
                               items: vec![(1, Some("osd.1".to_string()))],
@@ -106,7 +106,7 @@ fn test_decode_crushmap() {
                               struct_size: 4,
                               bucket_type: OpCode::Take,
                               alg: BucketAlg::Straw,
-                              hash: 0,
+                              hash: CrushHash::RJenkins1,
                               weight: 0,
                               size: 1,
                               items: vec![(2, Some("osd.2".to_string()))],
@@ -259,7 +259,7 @@ fn test_encode_crushmap() {
                               id: -1,
                               bucket_type: OpCode::SetChooseLocalTries,
                               alg: BucketAlg::Straw,
-                              hash: 0,
+                              hash: CrushHash::RJenkins1,
                               weight: 0,
                               size: 3,
                               items: vec![(-2, None), (-3, None), (-4, None)],
@@ -274,7 +274,7 @@ fn test_encode_crushmap() {
                               struct_size: 4,
                               bucket_type: OpCode::Take,
                               alg: BucketAlg::Straw,
-                              hash: 0,
+                              hash: CrushHash::RJenkins1,
                               weight: 0,
                               size: 1,
                               items: vec![(0, None)],
@@ -289,7 +289,7 @@ fn test_encode_crushmap() {
                               struct_size: 4,
                               bucket_type: OpCode::Take,
                               alg: BucketAlg::Straw,
-                              hash: 0,
+                              hash: CrushHash::RJenkins1,
                               weight: 0,
                               size: 1,
                               items: vec![(1, None)],
@@ -304,7 +304,7 @@ fn test_encode_crushmap() {
                               struct_size: 4,
                               bucket_type: OpCode::Take,
                               alg: BucketAlg::Straw,
-                              hash: 0,
+                              hash: CrushHash::RJenkins1,
                               weight: 0,
                               size: 1,
                               items: vec![(2, None)],
