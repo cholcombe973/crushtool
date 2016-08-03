@@ -103,16 +103,21 @@ enum_from_primitive!{
     #[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
     pub enum OpCode{
         Noop = 0,
-        Take = 1,         /// arg1 = value to start with */
-        ChooseFirstN = 2, /// arg1 = num items to pick */
-                          /// arg2 = type
-        ChooseIndep = 3,  /// same
-        Emit = 4,         /// no args
+        /* arg1 = value to start with*/
+        Take = 1,
+        /* arg1 = num items to pick
+        / arg2 = type*/
+        ChooseFirstN = 2,
+
+        /* same */
+        ChooseIndep = 3,
+        /*/ no args */
+        Emit = 4,
         ChooseLeafFirstN = 6,
         ChooseLeafIndep = 7,
 
-        SetChooseTries = 8, /// override choose_total_tries
-        SetChooseLeafTries = 9, /// override chooseleaf_descend_once
+        SetChooseTries = 8, /*/ override choose_total_tries */
+        SetChooseLeafTries = 9, /*/ override chooseleaf_descend_once */
         SetChooseLocalTries = 10,
         SetChooseLocalFallbackTries = 11,
         SetChooseLeafVaryR = 12
@@ -122,7 +127,8 @@ enum_from_primitive!{
 #[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
 pub struct CrushBucketUniform {
     pub bucket: Bucket,
-    pub item_weight: u32, /// 16-bit fixed point; all items equally weighted
+    /// 16-bit fixed point; all items equally weighted
+    pub item_weight: u32,
 }
 
 impl CrushBucketUniform {
@@ -421,18 +427,25 @@ fn parse_bucket<'a>(input: &'a [u8]) -> nom::IResult<&[u8], BucketTypes> {
 #[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
 pub struct Bucket {
     pub struct_size: u32,
-    pub id: i32, /// this'll be negative
-    pub bucket_type: OpCode, /// non-zero; type=0 is reserved for devices
-    pub alg: BucketAlg, /// one of CRUSH_BUCKET_*
-    pub hash: u8, /// which hash function to use, CRUSH_HASH_*
-    pub weight: u32, /// 16-bit fixed point
-    pub size: u32, /// num items
+    pub id: i32,
+    /// this'll be negative
+    pub bucket_type: OpCode,
+    /// non-zero; type=0 is reserved for devices
+    pub alg: BucketAlg,
+    /// one of CRUSH_BUCKET_*
+    pub hash: u8,
+    /// which hash function to use, CRUSH_HASH_*
+    pub weight: u32,
+    /// 16-bit fixed point
+    pub size: u32,
+    /// num items
     pub items: Vec<(i32, Option<String>)>,
     // cached random permutation: used for uniform bucket and for
     // the linear search fallback for the other bucket types.
     // /
     // perm_x: u32, /* @x for which *perm is defined */
-    pub perm_n: u32, /// num elements of *perm that are permuted/defined
+    pub perm_n: u32,
+    /// num elements of *perm that are permuted/defined
     pub perm: u32,
 }
 
