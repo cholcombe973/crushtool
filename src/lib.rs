@@ -434,7 +434,6 @@ fn parse_bucket<'a>(input: &'a [u8]) -> nom::IResult<&[u8], BucketTypes> {
 
 #[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
 pub struct Bucket {
-    // struct_size: u32,
     /// this'll be negative
     pub id: i32,
     /// non-zero; type=0 is reserved for devices
@@ -462,7 +461,7 @@ impl Bucket {
         trace!("bucket input: {:?}", input);
         chain!(
             input,
-            struct_size: le_u32~
+            le_u32~
             //switch on algorithm
             id: le_i32~
             bucket_type_bits: le_u16 ~
@@ -480,7 +479,6 @@ impl Bucket {
             ),
             ||{
                 Bucket{
-                    //struct_size: struct_size,
                     id: id,
                     bucket_type: bucket_type,
                     alg: alg,
