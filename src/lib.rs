@@ -63,19 +63,19 @@ impl From<io::Error> for EncodingError {
     }
 }
 
-// A bucket is a named container of other items (either devices or
-// other buckets).  Items within a bucket are chosen using one of a
-// few different algorithms.  The table summarizes how the speed of
-// each option measures up against mapping stability when items are
-// added or removed.
-//
-//  Bucket Alg     Speed       Additions    Removals
-//  ------------------------------------------------
-//  uniform         O(1)       poor         poor
-//  list            O(n)       optimal      poor
-//  tree            O(log n)   good         good
-//  straw           O(n)       optimal      optimal
-//
+/// A bucket is a named container of other items (either devices or
+/// other buckets).  Items within a bucket are chosen using one of a
+/// few different algorithms.  The table summarizes how the speed of
+/// each option measures up against mapping stability when items are
+/// added or removed.
+///
+///  Bucket Alg     Speed       Additions    Removals
+///  ------------------------------------------------
+///  uniform         O(1)       poor         poor
+///  list            O(n)       optimal      poor
+///  tree            O(log n)   good         good
+///  straw           O(n)       optimal      optimal
+///
 enum_from_primitive!{
     #[repr(u8)]
     #[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
@@ -103,16 +103,16 @@ enum_from_primitive!{
     #[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
     pub enum OpCode{
         Noop = 0,
-        Take = 1,          /* arg1 = value to start with */
-        ChooseFirstN = 2, /* arg1 = num items to pick */
-                          /* arg2 = type */
-        ChooseIndep = 3,  /* same */
-        Emit = 4,          /* no args */
+        Take = 1,         /// arg1 = value to start with */
+        ChooseFirstN = 2, /// arg1 = num items to pick */
+                          /// arg2 = type
+        ChooseIndep = 3,  /// same
+        Emit = 4,         /// no args
         ChooseLeafFirstN = 6,
         ChooseLeafIndep = 7,
 
-        SetChooseTries = 8, /* override choose_total_tries */
-        SetChooseLeafTries = 9, /* override chooseleaf_descend_once */
+        SetChooseTries = 8, /// override choose_total_tries
+        SetChooseLeafTries = 9, /// override chooseleaf_descend_once
         SetChooseLocalTries = 10,
         SetChooseLocalFallbackTries = 11,
         SetChooseLeafVaryR = 12
@@ -122,7 +122,7 @@ enum_from_primitive!{
 #[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
 pub struct CrushBucketUniform {
     pub bucket: Bucket,
-    pub item_weight: u32, // 16-bit fixed point; all items equally weighted
+    pub item_weight: u32, /// 16-bit fixed point; all items equally weighted
 }
 
 impl CrushBucketUniform {
@@ -186,8 +186,8 @@ impl CrushBucketList {
 
 #[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
 pub struct CrushBucketTree {
-    // note: h.size is _tree_ size, not number of
-    // actual items
+    /// note: h.size is _tree_ size, not number of
+    /// actual items
     pub bucket: Bucket,
     pub num_nodes: u8,
     pub node_weights: Vec<u32>,
@@ -278,7 +278,7 @@ named!(decode_32_or_64<&[u8], u32>,
     )
 );
 
-// This silly fucntion is needed because we don't know the name_map while
+// This silly function is needed because we don't know the name_map while
 // parsing the crush buckets. Only after we're finished parsing the crushmap
 // do we know the names
 fn none(input: &[u8]) -> nom::IResult<&[u8], Option<String>> {
@@ -421,18 +421,18 @@ fn parse_bucket<'a>(input: &'a [u8]) -> nom::IResult<&[u8], BucketTypes> {
 #[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
 pub struct Bucket {
     pub struct_size: u32,
-    pub id: i32, // this'll be negative
-    pub bucket_type: OpCode, // non-zero; type=0 is reserved for devices
-    pub alg: BucketAlg, // one of CRUSH_BUCKET_*
-    pub hash: u8, // which hash function to use, CRUSH_HASH_*
-    pub weight: u32, // 16-bit fixed point
-    pub size: u32, // num items
+    pub id: i32, /// this'll be negative
+    pub bucket_type: OpCode, /// non-zero; type=0 is reserved for devices
+    pub alg: BucketAlg, /// one of CRUSH_BUCKET_*
+    pub hash: u8, /// which hash function to use, CRUSH_HASH_*
+    pub weight: u32, /// 16-bit fixed point
+    pub size: u32, /// num items
     pub items: Vec<(i32, Option<String>)>,
     // cached random permutation: used for uniform bucket and for
     // the linear search fallback for the other bucket types.
     // /
     // perm_x: u32, /* @x for which *perm is defined */
-    pub perm_n: u32, // num elements of *perm that are permuted/defined
+    pub perm_n: u32, /// num elements of *perm that are permuted/defined
     pub perm: u32,
 }
 
@@ -508,10 +508,10 @@ impl Bucket {
     }
 }
 
-// CRUSH uses user-defined "rules" to describe how inputs should be
-// mapped to devices.  A rule consists of sequence of steps to perform
-// to generate the set of output devices.
-//
+/// CRUSH uses user-defined "rules" to describe how inputs should be
+/// mapped to devices.  A rule consists of sequence of steps to perform
+/// to generate the set of output devices.
+///
 #[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
 pub struct CrushRuleStep {
     pub op: OpCode,
@@ -560,10 +560,10 @@ impl CrushRuleStep {
     }
 }
 
-// The rule mask is used to describe what the rule is intended for.
-// Given a ruleset and size of output set, we search through the
-// rule list for a matching rule_mask.
-//
+/// The rule mask is used to describe what the rule is intended for.
+/// Given a ruleset and size of output set, we search through the
+/// rule list for a matching rule_mask.
+///
 #[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
 pub struct CrushRuleMask {
     pub ruleset: u8,
@@ -715,23 +715,23 @@ pub struct CrushMap {
     pub name_map: Vec<(i32, String)>,
     pub rule_name_map: Vec<(i32, String)>,
 
-    // choose local retries before re-descent
+    /// choose local retries before re-descent
     pub choose_local_tries: Option<u32>,
-    // choose local attempts using a fallback permutation before
-    // re-descent
+    /// choose local attempts using a fallback permutation before
+    /// re-descent
     pub choose_local_fallback_tries: Option<u32>,
-    // choose attempts before giving up
+    /// choose attempts before giving up
     pub choose_total_tries: Option<u32>,
-    // attempt chooseleaf inner descent once for firstn mode; on
-    // reject retry outer descent.  Note that this does *not*
-    // apply to a collision: in that case we will retry as we used
-    // to.
+    /// attempt chooseleaf inner descent once for firstn mode; on
+    /// reject retry outer descent.  Note that this does *not*
+    /// apply to a collision: in that case we will retry as we used
+    /// to.
     pub chooseleaf_descend_once: Option<u32>,
 
-    // if non-zero, feed r into chooseleaf, bit-shifted right by (r-1)
-    // bits.  a value of 1 is best for new clusters.  for legacy clusters
-    // that want to limit reshuffling, a value of 3 or 4 will make the
-    // mappings line up a bit better with previous mappings.
+    /// if non-zero, feed r into chooseleaf, bit-shifted right by (r-1)
+    /// bits.  a value of 1 is best for new clusters.  for legacy clusters
+    /// that want to limit reshuffling, a value of 3 or 4 will make the
+    /// mappings line up a bit better with previous mappings.
     pub chooseleaf_vary_r: Option<u8>,
     pub straw_calc_version: Option<u8>,
     pub choose_tries: Option<u32>,
