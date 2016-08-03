@@ -1,4 +1,5 @@
 language: rust
+cache: cargo
 addons:
   apt:
     packages:
@@ -6,7 +7,7 @@ addons:
       - libelf-dev
       - libudev-dev
       - libdw-dev
-
+      - binutils-dev # optional: only required for the --verify flag of coveralls
 rust:
   - beta
   - stable
@@ -17,12 +18,19 @@ before_script:
 script:
   - | 
       travis-cargo build &&
-      travis-cargo test
+      travis-cargo test &&
+      travis-cargo --only stable doc
 
 after_success:
+  - bash ./scripts/deploy-gh-pages.sh
   - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then travis-cargo coveralls --no-sudo --verify; fi
   - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then ./kcov/build/src/kcov --verify --coveralls-id=$TRAVIS_JOB_ID --exclude-pattern=/.cargo target/kcov target/debug/test-*; fi
-  - bash ./scripts/deploy-gh-pages.sh
 
 sudo: false
+notifications:
+  irc:
+    channels: "chat.freenode.net#openstack-charms"
+    template: "%{repository}#%{build_number} (%{branch} - %{commit} : %{author}): %{message} || Change view: %{compare_url}"
+    on_success: change
+    skip_join: true
 
