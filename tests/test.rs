@@ -55,7 +55,6 @@ fn test_decode_crushmap() {
         max_devices: 3,
         buckets: vec![BucketTypes::Straw(CrushBucketStraw {
                           bucket: Bucket {
-                              struct_size: 4,
                               id: -1,
                               bucket_type: OpCode::SetChooseLocalTries,
                               alg: BucketAlg::Straw,
@@ -73,7 +72,6 @@ fn test_decode_crushmap() {
                       BucketTypes::Straw(CrushBucketStraw {
                           bucket: Bucket {
                               id: -2,
-                              struct_size: 4,
                               bucket_type: OpCode::Take,
                               alg: BucketAlg::Straw,
                               hash: CrushHash::RJenkins1,
@@ -88,7 +86,6 @@ fn test_decode_crushmap() {
                       BucketTypes::Straw(CrushBucketStraw {
                           bucket: Bucket {
                               id: -3,
-                              struct_size: 4,
                               bucket_type: OpCode::Take,
                               alg: BucketAlg::Straw,
                               hash: CrushHash::RJenkins1,
@@ -103,7 +100,6 @@ fn test_decode_crushmap() {
                       BucketTypes::Straw(CrushBucketStraw {
                           bucket: Bucket {
                               id: -4,
-                              struct_size: 4,
                               bucket_type: OpCode::Take,
                               alg: BucketAlg::Straw,
                               hash: CrushHash::RJenkins1,
@@ -255,7 +251,6 @@ fn test_encode_crushmap() {
         max_devices: 3,
         buckets: vec![BucketTypes::Straw(CrushBucketStraw {
                           bucket: Bucket {
-                              struct_size: 4,
                               id: -1,
                               bucket_type: OpCode::SetChooseLocalTries,
                               alg: BucketAlg::Straw,
@@ -271,7 +266,6 @@ fn test_encode_crushmap() {
                       BucketTypes::Straw(CrushBucketStraw {
                           bucket: Bucket {
                               id: -2,
-                              struct_size: 4,
                               bucket_type: OpCode::Take,
                               alg: BucketAlg::Straw,
                               hash: CrushHash::RJenkins1,
@@ -286,7 +280,6 @@ fn test_encode_crushmap() {
                       BucketTypes::Straw(CrushBucketStraw {
                           bucket: Bucket {
                               id: -3,
-                              struct_size: 4,
                               bucket_type: OpCode::Take,
                               alg: BucketAlg::Straw,
                               hash: CrushHash::RJenkins1,
@@ -301,7 +294,6 @@ fn test_encode_crushmap() {
                       BucketTypes::Straw(CrushBucketStraw {
                           bucket: Bucket {
                               id: -4,
-                              struct_size: 4,
                               bucket_type: OpCode::Take,
                               alg: BucketAlg::Straw,
                               hash: CrushHash::RJenkins1,

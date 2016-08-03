@@ -434,7 +434,7 @@ fn parse_bucket<'a>(input: &'a [u8]) -> nom::IResult<&[u8], BucketTypes> {
 
 #[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
 pub struct Bucket {
-    pub struct_size: u32,
+    // struct_size: u32,
     /// this'll be negative
     pub id: i32,
     /// non-zero; type=0 is reserved for devices
@@ -480,7 +480,7 @@ impl Bucket {
             ),
             ||{
                 Bucket{
-                    struct_size: struct_size,
+                    //struct_size: struct_size,
                     id: id,
                     bucket_type: bucket_type,
                     alg: alg,
@@ -496,7 +496,7 @@ impl Bucket {
     }
     fn compile(&self) -> Result<Vec<u8>, EncodingError> {
         let mut buffer: Vec<u8> = Vec::new();
-        try!(buffer.write_u32::<LittleEndian>(self.struct_size));
+        try!(buffer.write_u32::<LittleEndian>(self.alg.clone() as u32));
         try!(buffer.write_i32::<LittleEndian>(self.id));
         try!(buffer.write_u16::<LittleEndian>(self.bucket_type.clone() as u16));
         try!(buffer.write_u8(self.alg.clone() as u8));
