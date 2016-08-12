@@ -87,7 +87,7 @@ impl From<io::Error> for EncodingError {
 ///
 enum_from_primitive!{
     #[repr(u8)]
-    #[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
+    #[derive(Debug, Clone, Eq, Hash, PartialEq, RustcEncodable)]
     pub enum BucketAlg{
         Uniform = 1,
         List = 2,
@@ -108,7 +108,7 @@ enum_from_primitive!{
 
 enum_from_primitive!{
     #[repr(u8)]
-    #[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
+    #[derive(Debug, Clone, Eq, Hash, PartialEq, RustcEncodable)]
     pub enum CrushHash{
         RJenkins1 = 0,
     }
@@ -117,7 +117,7 @@ enum_from_primitive!{
 // step op codes
 enum_from_primitive!{
     #[repr(u16)]
-    #[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
+    #[derive(Debug, Clone, Eq, Hash, PartialEq, RustcEncodable)]
     pub enum OpCode{
         Noop = 0,
         /* arg1 = value to start with*/
@@ -141,7 +141,7 @@ enum_from_primitive!{
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
+#[derive(Debug, Clone, Eq, Hash, PartialEq, RustcEncodable)]
 pub struct CrushBucketUniform {
     pub bucket: Bucket,
     /// 16-bit fixed point; all items equally weighted
@@ -172,7 +172,7 @@ impl CrushBucketUniform {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
+#[derive(Debug, Clone, Eq, Hash, PartialEq, RustcEncodable)]
 pub struct CrushBucketList {
     pub bucket: Bucket,
     pub item_weights: Vec<(u32, u32)>,
@@ -207,7 +207,7 @@ impl CrushBucketList {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
+#[derive(Debug, Clone, Eq, Hash, PartialEq, RustcEncodable)]
 pub struct CrushBucketTree {
     /// note: h.size is _tree_ size, not number of
     /// actual items
@@ -441,7 +441,7 @@ fn parse_bucket<'a>(input: &'a [u8]) -> nom::IResult<&[u8], BucketTypes> {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
+#[derive(Debug, Clone, Eq, Hash, PartialEq, RustcEncodable)]
 pub struct Bucket {
     /// this'll be negative
     pub id: i32,
