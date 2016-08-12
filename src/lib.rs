@@ -10,6 +10,7 @@ extern crate nom;
 extern crate num;
 extern crate rustc_serialize;
 
+use std::error::Error;
 use std::io::{self, ErrorKind};
 use std::string::FromUtf8Error;
 
@@ -48,6 +49,14 @@ pub enum EncodingError {
 impl EncodingError {
     pub fn new(err: String) -> EncodingError {
         EncodingError::IoError(io::Error::new(ErrorKind::Other, err))
+    }
+    pub fn to_string(&self) -> String {
+        match *self {
+            EncodingError::IoError(ref err) => err.description().to_string(),
+            EncodingError::InvalidValue => "Invalid Value".to_string(),
+            EncodingError::InvalidType => "Invalid Type".to_string(),
+            EncodingError::FromUtf8Error(ref err) => err.utf8_error().to_string(),
+        }
     }
 }
 
