@@ -246,7 +246,7 @@ impl CrushBucketTree {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
+#[derive(Debug, Clone, Eq, Hash, PartialEq, RustcEncodable)]
 pub struct CrushBucketStraw {
     pub bucket: Bucket,
     pub item_weights: Vec<(u32, u32)>,
@@ -281,7 +281,7 @@ impl CrushBucketStraw {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
+#[derive(Debug, Clone, Eq, Hash, PartialEq, RustcEncodable)]
 pub enum BucketTypes {
     Uniform(CrushBucketUniform),
     List(CrushBucketList),
