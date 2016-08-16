@@ -22,22 +22,68 @@ use nom::{le_u8, le_u16, le_i32, le_u32};
 
 static CRUSH_MAGIC: u32 = 0x00010000;  /* for detecting algorithm revisions */
 
-// TODO: Set default tunables to optimal
-// fn set_tunables_firefly<'a>(input: &'a mut CrushMap) ->&'a mut CrushMap{
-// input.choose_local_tries = Some(0);
-// input.choose_local_fallback_tries = Some(0);
-// input.choose_total_tries = Some(50);
-// input.chooseleaf_descend_once = Some(1);
-// input.chooseleaf_vary_r = Some(1);
-// input
-// }
-//
-// fn set_tunables_optimal<'a>(input: &'a mut CrushMap) ->&'a mut CrushMap{
-// let input = set_tunables_firefly(input);
-// input.straw_calc_version = Some(1);
-// input
-// }
-//
+pub fn set_tunables_argonaut(crushmap: &mut CrushMap) -> &mut CrushMap {
+    let algorithm: u32 = (1 << BucketAlg::Uniform as u32) | (1 << BucketAlg::List as u32) |
+                         (1 << BucketAlg::Straw as u32);
+    crushmap.choose_local_tries = Some(2);
+    crushmap.choose_local_fallback_tries = Some(5);
+    crushmap.choose_total_tries = Some(19);
+    crushmap.chooseleaf_descend_once = Some(0);
+    crushmap.chooseleaf_vary_r = Some(0);
+    crushmap.chooseleaf_stable = Some(0);
+    crushmap.allowed_bucket_algorithms = Some(algorithm);
+    crushmap
+}
+pub fn set_tunables_bobtail(crushmap: &mut CrushMap) -> &mut CrushMap {
+    let algorithm: u32 = (1 << BucketAlg::Uniform as u32) | (1 << BucketAlg::List as u32) |
+                         (1 << BucketAlg::Straw as u32);
+    crushmap.choose_local_tries = Some(0);
+    crushmap.choose_local_fallback_tries = Some(0);
+    crushmap.choose_total_tries = Some(50);
+    crushmap.chooseleaf_descend_once = Some(1);
+    crushmap.chooseleaf_vary_r = Some(0);
+    crushmap.chooseleaf_stable = Some(0);
+    crushmap.allowed_bucket_algorithms = Some(algorithm);
+    crushmap
+}
+pub fn set_tunables_firefly(crushmap: &mut CrushMap) -> &mut CrushMap {
+    let algorithm: u32 = (1 << BucketAlg::Uniform as u32) | (1 << BucketAlg::List as u32) |
+                         (1 << BucketAlg::Straw as u32);
+    crushmap.choose_local_tries = Some(0);
+    crushmap.choose_local_fallback_tries = Some(0);
+    crushmap.choose_total_tries = Some(50);
+    crushmap.chooseleaf_descend_once = Some(1);
+    crushmap.chooseleaf_vary_r = Some(1);
+    crushmap.chooseleaf_stable = Some(0);
+    crushmap.allowed_bucket_algorithms = Some(algorithm);
+    crushmap
+}
+pub fn set_tunables_hammer(crushmap: &mut CrushMap) -> &mut CrushMap {
+    let algorithm: u32 = (1 << BucketAlg::Uniform as u32) | (1 << BucketAlg::List as u32) |
+                         (1 << BucketAlg::Straw as u32) |
+                         (1 << BucketAlg::Straw2 as u32);
+    crushmap.choose_local_tries = Some(0);
+    crushmap.choose_local_fallback_tries = Some(0);
+    crushmap.choose_total_tries = Some(50);
+    crushmap.chooseleaf_descend_once = Some(1);
+    crushmap.chooseleaf_vary_r = Some(1);
+    crushmap.chooseleaf_stable = Some(0);
+    crushmap.allowed_bucket_algorithms = Some(algorithm);
+    crushmap
+}
+pub fn set_tunables_jewel(crushmap: &mut CrushMap) -> &mut CrushMap {
+    let algorithm: u32 = (1 << BucketAlg::Uniform as u32) | (1 << BucketAlg::List as u32) |
+                         (1 << BucketAlg::Straw as u32) |
+                         (1 << BucketAlg::Straw2 as u32);
+    crushmap.choose_local_tries = Some(0);
+    crushmap.choose_local_fallback_tries = Some(0);
+    crushmap.choose_total_tries = Some(50);
+    crushmap.chooseleaf_descend_once = Some(1);
+    crushmap.chooseleaf_vary_r = Some(1);
+    crushmap.chooseleaf_stable = Some(1);
+    crushmap.allowed_bucket_algorithms = Some(algorithm);
+    crushmap
+}
 
 #[derive(Debug)]
 pub enum EncodingError {
@@ -94,6 +140,7 @@ enum_from_primitive!{
         List = 2,
         Tree = 3,
         Straw = 4,
+        Straw2 = 5,
     }
 }
 
@@ -246,6 +293,67 @@ impl CrushBucketTree {
         Ok(buffer)
     }
 }
+#[derive(Clone, Eq, Hash, PartialEq, RustcEncodable)]
+pub struct CrushBucketStraw2 {
+    pub bucket: Bucket,
+    pub item_weights: Vec<u32>,
+}
+
+impl CrushBucketStraw2 {
+    fn parse<'a>(input: &'a [u8]) -> nom::IResult<&[u8], Self> {
+        chain!(
+            input,
+            bucket: call!(Bucket::parse)~
+            item_weights: count!(le_u32, bucket.size as usize),
+            ||{
+                CrushBucketStraw2{
+                    bucket: bucket,
+                    item_weights: item_weights,
+                }
+            }
+        )
+    }
+    fn compile(&self) -> Result<Vec<u8>, EncodingError> {
+        let mut buffer: Vec<u8> = Vec::new();
+        buffer.extend(try!(self.bucket.compile()));
+
+        for weight in self.item_weights.iter() {
+            try!(buffer.write_u32::<LittleEndian>(*weight));
+        }
+
+        Ok(buffer)
+    }
+}
+impl fmt::Debug for CrushBucketStraw2 {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f,
+            r#"Straw(CrushBucketStraw {{
+                bucket: Bucket {{
+                    id: {},
+                    bucket_type: {:?},
+                    alg: {:?},
+                    hash: {:?},
+                    weight: {},
+                    size: {},
+                    items: {:?},
+                    perm_n: {},
+                    perm: {}
+                }},
+                item_weights: {:?}
+            }})"#,
+            self.bucket.id,
+            self.bucket.bucket_type,
+            self.bucket.alg,
+            self.bucket.hash,
+            self.bucket.weight,
+            self.bucket.size,
+            self.bucket.items,
+            self.bucket.perm_n,
+            self.bucket.perm,
+            self.item_weights,
+        )
+    }
+}
 
 #[derive(Clone, Eq, Hash, PartialEq, RustcEncodable)]
 pub struct CrushBucketStraw {
@@ -320,6 +428,7 @@ pub enum BucketTypes {
     List(CrushBucketList),
     Tree(CrushBucketTree),
     Straw(CrushBucketStraw),
+    Straw2(CrushBucketStraw2),
     Unknown,
 }
 
@@ -460,6 +569,16 @@ fn parse_bucket<'a>(input: &'a [u8]) -> nom::IResult<&[u8], BucketTypes> {
                         straw_bucket: dbg!(call!(CrushBucketStraw::parse)),
                         ||{
                             BucketTypes::Straw(straw_bucket)
+                        }
+                    )
+                }
+                BucketAlg::Straw2 => {
+                    trace!("Trying to decode straw2 bucket");
+                    chain!(
+                        input,
+                        straw_bucket: dbg!(call!(CrushBucketStraw2::parse)),
+                        ||{
+                            BucketTypes::Straw2(straw_bucket)
                         }
                     )
                 }
@@ -790,6 +909,9 @@ fn update_buckets<'a>(crush_buckets: &'a mut Vec<BucketTypes>,
             BucketTypes::Straw(ref mut straw) => {
                 straw.bucket.update_name_mapping(name_map);
             }
+            BucketTypes::Straw2(ref mut straw) => {
+                straw.bucket.update_name_mapping(name_map);
+            }
             BucketTypes::Unknown => {}
         }
     }
@@ -973,6 +1095,10 @@ pub fn encode_crushmap(crushmap: CrushMap) -> Result<Vec<u8>, EncodingError> {
             }
             &BucketTypes::Straw(ref straw) => {
                 trace!("Trying to encode straw bucket");
+                buffer.extend(try!(straw.compile()));
+            }
+            &BucketTypes::Straw2(ref straw) => {
+                trace!("Trying to encode straw2 bucket");
                 buffer.extend(try!(straw.compile()));
             }
             &BucketTypes::Unknown => {
