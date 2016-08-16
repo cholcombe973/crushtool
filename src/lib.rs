@@ -1,5 +1,15 @@
-// Decompile a ceph crushmap for fun and profit
-//
+//! Decompile a ceph crushmap for fun and profit
+//!
+//!
+//! CRUSH is a pseudo-random data distribution algorithm that
+//! efficiently distributes input values (typically, data objects)
+//! across a heterogeneous, structured storage cluster.
+//!
+//! The algorithm was originally described in detail in this paper
+//! (although the algorithm has evolved somewhat since then):
+//! http://www.ssrc.ucsc.edu/Papers/weil-sc06.pdf
+//!
+
 extern crate byteorder;
 #[macro_use]
 extern crate enum_primitive;
@@ -22,6 +32,8 @@ use nom::{le_u8, le_u16, le_i32, le_u32};
 
 static CRUSH_MAGIC: u32 = 0x00010000;  /* for detecting algorithm revisions */
 
+/// Set the crush tunables to Argonaut
+///
 pub fn set_tunables_argonaut(crushmap: &mut CrushMap) -> &mut CrushMap {
     let algorithm: u32 = (1 << BucketAlg::Uniform as u32) | (1 << BucketAlg::List as u32) |
                          (1 << BucketAlg::Straw as u32);
@@ -34,6 +46,8 @@ pub fn set_tunables_argonaut(crushmap: &mut CrushMap) -> &mut CrushMap {
     crushmap.allowed_bucket_algorithms = Some(algorithm);
     crushmap
 }
+/// Set the crush tunables to Bobtail
+///
 pub fn set_tunables_bobtail(crushmap: &mut CrushMap) -> &mut CrushMap {
     let algorithm: u32 = (1 << BucketAlg::Uniform as u32) | (1 << BucketAlg::List as u32) |
                          (1 << BucketAlg::Straw as u32);
@@ -46,6 +60,8 @@ pub fn set_tunables_bobtail(crushmap: &mut CrushMap) -> &mut CrushMap {
     crushmap.allowed_bucket_algorithms = Some(algorithm);
     crushmap
 }
+/// Set the crush tunables to Firefly
+///
 pub fn set_tunables_firefly(crushmap: &mut CrushMap) -> &mut CrushMap {
     let algorithm: u32 = (1 << BucketAlg::Uniform as u32) | (1 << BucketAlg::List as u32) |
                          (1 << BucketAlg::Straw as u32);
@@ -58,6 +74,8 @@ pub fn set_tunables_firefly(crushmap: &mut CrushMap) -> &mut CrushMap {
     crushmap.allowed_bucket_algorithms = Some(algorithm);
     crushmap
 }
+/// Set the crush tunables to Hammer
+///
 pub fn set_tunables_hammer(crushmap: &mut CrushMap) -> &mut CrushMap {
     let algorithm: u32 = (1 << BucketAlg::Uniform as u32) | (1 << BucketAlg::List as u32) |
                          (1 << BucketAlg::Straw as u32) |
@@ -71,6 +89,9 @@ pub fn set_tunables_hammer(crushmap: &mut CrushMap) -> &mut CrushMap {
     crushmap.allowed_bucket_algorithms = Some(algorithm);
     crushmap
 }
+
+/// Set the crush tunables to Jewel
+///
 pub fn set_tunables_jewel(crushmap: &mut CrushMap) -> &mut CrushMap {
     let algorithm: u32 = (1 << BucketAlg::Uniform as u32) | (1 << BucketAlg::List as u32) |
                          (1 << BucketAlg::Straw as u32) |
@@ -189,6 +210,7 @@ enum_from_primitive!{
     }
 }
 
+/// All items are equally weighted.
 #[derive(Debug, Clone, Eq, Hash, PartialEq, RustcEncodable)]
 pub struct CrushBucketUniform {
     pub bucket: Bucket,
@@ -223,6 +245,7 @@ impl CrushBucketUniform {
 #[derive(Debug, Clone, Eq, Hash, PartialEq, RustcEncodable)]
 pub struct CrushBucketList {
     pub bucket: Bucket,
+    ///  All weights are in 16-bit fixed point
     pub item_weights: Vec<(u32, u32)>,
 }
 impl CrushBucketList {
@@ -255,6 +278,8 @@ impl CrushBucketList {
     }
 }
 
+/// CrushBucketTree is generally not used in Ceph because the
+/// algorithm is buggy.
 #[derive(Debug, Clone, Eq, Hash, PartialEq, RustcEncodable)]
 pub struct CrushBucketTree {
     /// note: h.size is _tree_ size, not number of
@@ -296,6 +321,7 @@ impl CrushBucketTree {
 #[derive(Clone, Eq, Hash, PartialEq, RustcEncodable)]
 pub struct CrushBucketStraw2 {
     pub bucket: Bucket,
+    ///  All weights are in 16-bit fixed point
     pub item_weights: Vec<u32>,
 }
 
@@ -358,6 +384,7 @@ impl fmt::Debug for CrushBucketStraw2 {
 #[derive(Clone, Eq, Hash, PartialEq, RustcEncodable)]
 pub struct CrushBucketStraw {
     pub bucket: Bucket,
+    ///  All weights are in 16-bit fixed point
     pub item_weights: Vec<(u32, u32)>,
 }
 
@@ -819,7 +846,6 @@ impl fmt::Debug for CrushRuleMask {
 
 #[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
 pub struct Rule {
-    // pub len: u32,
     pub mask: CrushRuleMask,
     pub steps: Vec<CrushRuleStep>,
 }
@@ -918,6 +944,7 @@ fn update_buckets<'a>(crush_buckets: &'a mut Vec<BucketTypes>,
     crush_buckets
 }
 
+/// CrushMap includes all buckets, rules, etc.
 #[derive(Clone, Eq, PartialEq, RustcEncodable)]
 pub struct CrushMap {
     pub magic: u32,
@@ -951,7 +978,17 @@ pub struct CrushMap {
     /// mappings line up a bit better with previous mappings.
     pub chooseleaf_vary_r: Option<u8>,
     pub straw_calc_version: Option<u8>,
+    ///
+    /// allowed_bucket_algorithms is a bitmask, here the bit positions
+    /// are BucketAlg::*.  note that these are *bits* and
+    /// BucketAlg* values are not, so we need to or together (1
+    /// << BucketAlg::Some_Value).  The 0th bit is not used to
+    /// minimize confusion (bucket type values start at 1).
+    ///
     pub allowed_bucket_algorithms: Option<u32>,
+    /// if set to 1, it makes chooseleaf firstn to return stable results (if
+    /// no local retry) so that data migrations would be optimal when some
+    /// device fails.
     pub chooseleaf_stable: Option<u8>,
 }
 
