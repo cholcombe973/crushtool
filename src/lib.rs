@@ -11,6 +11,7 @@ extern crate num;
 extern crate rustc_serialize;
 
 use std::error::Error;
+use std::fmt;
 use std::io::{self, ErrorKind};
 use std::string::FromUtf8Error;
 
@@ -246,7 +247,7 @@ impl CrushBucketTree {
     }
 }
 
-#[derive(Debug, Clone, Eq, Hash, PartialEq, RustcEncodable)]
+#[derive(Clone, Eq, Hash, PartialEq, RustcEncodable)]
 pub struct CrushBucketStraw {
     pub bucket: Bucket,
     pub item_weights: Vec<(u32, u32)>,
@@ -281,7 +282,39 @@ impl CrushBucketStraw {
     }
 }
 
-#[derive(Debug, Clone, Eq, Hash, PartialEq, RustcEncodable)]
+impl fmt::Debug for CrushBucketStraw {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f,
+            r#"Straw(CrushBucketStraw {{
+                bucket: Bucket {{
+                    id: {},
+                    bucket_type: {:?},
+                    alg: {:?},
+                    hash: {:?},
+                    weight: {},
+                    size: {},
+                    items: {:?},
+                    perm_n: {},
+                    perm: {}
+                }},
+                item_weights: {:?}
+            }})"#,
+            self.bucket.id,
+            self.bucket.bucket_type,
+            self.bucket.alg,
+            self.bucket.hash,
+            self.bucket.weight,
+            self.bucket.size,
+            self.bucket.items,
+            self.bucket.perm_n,
+            self.bucket.perm,
+            self.item_weights,
+        )
+    }
+}
+
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq, RustcEncodable)]
 pub enum BucketTypes {
     Uniform(CrushBucketUniform),
     List(CrushBucketList),
@@ -309,7 +342,7 @@ fn none(input: &[u8]) -> nom::IResult<&[u8], Option<String>> {
 }
 
 fn try_le_u8(input: &[u8]) -> nom::IResult<&[u8], Option<u8>> {
-    if input.len() == 0 {
+    if input.len() < 1 {
         nom::IResult::Done(input, None)
     } else {
         chain!(input,
@@ -322,7 +355,7 @@ fn try_le_u8(input: &[u8]) -> nom::IResult<&[u8], Option<u8>> {
 }
 
 fn try_le_u32(input: &[u8]) -> nom::IResult<&[u8], Option<u32>> {
-    if input.len() < 5 {
+    if input.len() < 4 {
         nom::IResult::Done(input, None)
     } else {
         chain!(input,
@@ -541,7 +574,7 @@ impl Bucket {
 /// mapped to devices.  A rule consists of sequence of steps to perform
 /// to generate the set of output devices.
 ///
-#[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
+#[derive(Clone, Eq, PartialEq, RustcEncodable)]
 pub struct CrushRuleStep {
     pub op: OpCode,
     pub arg1: (i32, Option<String>),
@@ -589,11 +622,27 @@ impl CrushRuleStep {
     }
 }
 
+impl fmt::Debug for CrushRuleStep {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f,
+            r#"CrushRuleStep {{
+                op: {:?},
+                arg1: {:?},
+                arg2: {:?},
+            }}"#,
+            self.op,
+            self.arg1,
+            self.arg2,
+        )
+    }
+}
+
+
 /// The rule mask is used to describe what the rule is intended for.
 /// Given a ruleset and size of output set, we search through the
 /// rule list for a matching rule_mask.
 ///
-#[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
+#[derive(Clone, Eq, PartialEq, RustcEncodable)]
 pub struct CrushRuleMask {
     pub ruleset: u8,
     pub rule_type: RuleType,
@@ -631,10 +680,27 @@ impl CrushRuleMask {
         Ok(buffer)
     }
 }
+impl fmt::Debug for CrushRuleMask {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f,
+            r#"CrushRuleMask {{
+                ruleset: {},
+                rule_type: {:?},
+                min_size: {},
+                max_size: {},
+            }}"#,
+            self.ruleset,
+            self.rule_type,
+            self.min_size,
+            self.max_size,
+        )
+    }
+}
+
 
 #[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
 pub struct Rule {
-    pub len: u32,
+    // pub len: u32,
     pub mask: CrushRuleMask,
     pub steps: Vec<CrushRuleStep>,
 }
@@ -650,12 +716,12 @@ impl Rule {
                 } else {
                     chain!(
                         unparsed_data,
+                        //Length.  We don't need this because we know how long the Vec is
                         length: le_u32~
                         mask: dbg!(call!(CrushRuleMask::parse))~
                         steps: dbg!(count!(call!(CrushRuleStep::parse), length as usize)),
                         ||{
                             Some(Rule{
-                                len: length,
                                 mask: mask,
                                 steps: steps,
                             })
@@ -676,7 +742,7 @@ impl Rule {
         // YES
         try!(buffer.write_u32::<LittleEndian>(1));
 
-        try!(buffer.write_u32::<LittleEndian>(self.len));
+        try!(buffer.write_u32::<LittleEndian>(self.steps.len() as u32));
         buffer.extend(try!(self.mask.compile()));
         // Steps length
         for step in self.steps.iter() {
@@ -730,7 +796,7 @@ fn update_buckets<'a>(crush_buckets: &'a mut Vec<BucketTypes>,
     crush_buckets
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
+#[derive(Clone, Eq, PartialEq, RustcEncodable)]
 pub struct CrushMap {
     pub magic: u32,
     pub max_buckets: i32,
@@ -763,7 +829,49 @@ pub struct CrushMap {
     /// mappings line up a bit better with previous mappings.
     pub chooseleaf_vary_r: Option<u8>,
     pub straw_calc_version: Option<u8>,
-    pub choose_tries: Option<u32>,
+    pub allowed_bucket_algorithms: Option<u32>,
+    pub chooseleaf_stable: Option<u8>,
+}
+
+impl fmt::Debug for CrushMap {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f,
+            r#"CrushMap {{
+                magic: {},
+                max_buckets: {},
+                max_rules: {},
+                max_devices: {},
+                buckets: {:?},
+                rules: {:?},
+                name_map: {:?},
+                rule_name_map: {:?},
+                choose_local_tries: {:?},
+                choose_local_fallback_tries: {:?},
+                choose_total_tries: {:?},
+                chooseleaf_descend_once: {:?},
+                chooseleaf_vary_r: {:?},
+                straw_calc_version: {:?},
+                allowed_bucket_algorithms: {:?},
+                chooseleaf_stable: {:?},
+            }}"#,
+            self.magic,
+            self.max_buckets,
+            self.max_rules,
+            self.max_devices,
+            self.buckets,
+            self.rules,
+            self.name_map,
+            self.rule_name_map,
+            self.choose_local_tries,
+            self.choose_local_fallback_tries,
+            self.choose_total_tries,
+            self.chooseleaf_descend_once,
+            self.chooseleaf_vary_r,
+            self.straw_calc_version,
+            self.allowed_bucket_algorithms,
+            self.chooseleaf_stable,
+        )
+    }
 }
 
 pub fn decode_crushmap<'a>(input: &'a [u8]) -> Result<CrushMap, String> {
@@ -814,7 +922,8 @@ fn parse_crushmap<'a>(input: &'a [u8]) -> nom::IResult<&[u8], CrushMap> {
         chooseleaf_descend_once: call!(try_le_u32) ~
         chooseleaf_vary_r: call!(try_le_u8) ~
         straw_calc_version: call!(try_le_u8) ~
-        choose_tries: call!(try_le_u32) ,
+        allowed_bucket_algorithms: call!(try_le_u32) ~
+        chooseleaf_stable: call!(try_le_u8),
         || {
             CrushMap{
                 magic: crush_magic,
@@ -834,7 +943,8 @@ fn parse_crushmap<'a>(input: &'a [u8]) -> nom::IResult<&[u8], CrushMap> {
                 chooseleaf_descend_once: chooseleaf_descend_once,
                 chooseleaf_vary_r: chooseleaf_vary_r,
                 straw_calc_version: straw_calc_version,
-                choose_tries: choose_tries,
+                allowed_bucket_algorithms: allowed_bucket_algorithms,
+                chooseleaf_stable: chooseleaf_stable,
             }
         }
     )
@@ -884,26 +994,70 @@ pub fn encode_crushmap(crushmap: CrushMap) -> Result<Vec<u8>, EncodingError> {
     buffer.extend(try!(encode_string_map(crushmap.name_map)));
     buffer.extend(try!(encode_string_map(crushmap.rule_name_map)));
 
-    if crushmap.choose_local_tries.is_some() {
-        try!(buffer.write_u32::<LittleEndian>(crushmap.choose_local_tries.unwrap()));
-    }
-    if crushmap.choose_local_fallback_tries.is_some() {
-        try!(buffer.write_u32::<LittleEndian>(crushmap.choose_local_fallback_tries.unwrap()));
-    }
-    if crushmap.choose_total_tries.is_some() {
-        try!(buffer.write_u32::<LittleEndian>(crushmap.choose_total_tries.unwrap()));
-    }
-    if crushmap.chooseleaf_descend_once.is_some() {
-        try!(buffer.write_u32::<LittleEndian>(crushmap.chooseleaf_descend_once.unwrap()));
-    }
-    if crushmap.chooseleaf_vary_r.is_some() {
-        try!(buffer.write_u8(crushmap.chooseleaf_vary_r.unwrap()));
-    }
-    if crushmap.straw_calc_version.is_some() {
-        try!(buffer.write_u8(crushmap.straw_calc_version.unwrap()));
-    }
-    if crushmap.choose_tries.is_some() {
-        try!(buffer.write_u32::<LittleEndian>(crushmap.choose_tries.unwrap()));
+    match crushmap.choose_local_tries {
+        Some(val) => {
+            try!(buffer.write_u32::<LittleEndian>(val));
+        }
+        None => {
+            try!(buffer.write_u32::<LittleEndian>(0));
+        }
+    };
+
+    match crushmap.choose_local_fallback_tries {
+        Some(val) => {
+            try!(buffer.write_u32::<LittleEndian>(val));
+        }
+        None => {
+            try!(buffer.write_u32::<LittleEndian>(0));
+        }
+    };
+    match crushmap.choose_total_tries {
+        Some(val) => {
+            try!(buffer.write_u32::<LittleEndian>(val));
+        }
+        None => {
+            try!(buffer.write_u32::<LittleEndian>(0));
+        }
+    };
+    match crushmap.chooseleaf_descend_once {
+        Some(val) => {
+            try!(buffer.write_u32::<LittleEndian>(val));
+        }
+        None => {
+            try!(buffer.write_u32::<LittleEndian>(0));
+        }
+    };
+    match crushmap.chooseleaf_vary_r {
+        Some(val) => {
+            try!(buffer.write_u8(val));
+        }
+        None => {
+            try!(buffer.write_u8(0));
+        }
+    };
+    match crushmap.straw_calc_version {
+        Some(val) => {
+            try!(buffer.write_u8(val));
+        }
+        None => {
+            try!(buffer.write_u8(0));
+        }
+    };
+    match crushmap.allowed_bucket_algorithms {
+        Some(val) => {
+            try!(buffer.write_u32::<LittleEndian>(val));
+        }
+        None => {
+            try!(buffer.write_u32::<LittleEndian>(0));
+        }
+    };
+    match crushmap.chooseleaf_stable {
+        Some(val) => {
+            try!(buffer.write_u8(val));
+        }
+        None => {
+            try!(buffer.write_u8(0));
+        }
     }
 
     Ok(buffer)
