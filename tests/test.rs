@@ -2,7 +2,71 @@ extern crate nom;
 extern crate crushtool;
 use crushtool::{CrushMap, BucketTypes, CrushBucketStraw, CrushBucketStraw2, OpCode, BucketAlg,
                 CrushRuleStep, Bucket, CrushRuleMask, CrushHash, Rule, RuleType, decode_crushmap,
-                encode_crushmap};
+                encode_crushmap, set_tunables_jewel};
+
+#[test]
+fn it_sets_tunables_correctly() {
+    let mut crushmap = CrushMap {
+        magic: 65536,
+        max_buckets: 8,
+        max_rules: 1,
+        max_devices: 3,
+        buckets: vec![],
+        rules: vec![],
+        type_map: vec![(0, "osd".to_string()),
+                       (1, "host".to_string()),
+                       (2, "chassis".to_string()),
+                       (3, "rack".to_string()),
+                       (4, "row".to_string()),
+                       (5, "pdu".to_string()),
+                       (6, "pod".to_string()),
+                       (7, "room".to_string()),
+                       (8, "datacenter".to_string()),
+                       (9, "region".to_string()),
+                       (10, "root".to_string())],
+        name_map: vec![],
+        rule_name_map: vec![],
+        choose_local_tries: Some(0),
+        choose_local_fallback_tries: Some(0),
+        choose_total_tries: Some(0),
+        chooseleaf_descend_once: Some(0),
+        chooseleaf_vary_r: Some(0),
+        straw_calc_version: Some(0),
+        allowed_bucket_algorithms: Some(0),
+        chooseleaf_stable: Some(0),
+    };
+    let expected = CrushMap {
+        magic: 65536,
+        max_buckets: 8,
+        max_rules: 1,
+        max_devices: 3,
+        buckets: vec![],
+        rules: vec![],
+        type_map: vec![(0, "osd".to_string()),
+                       (1, "host".to_string()),
+                       (2, "chassis".to_string()),
+                       (3, "rack".to_string()),
+                       (4, "row".to_string()),
+                       (5, "pdu".to_string()),
+                       (6, "pod".to_string()),
+                       (7, "room".to_string()),
+                       (8, "datacenter".to_string()),
+                       (9, "region".to_string()),
+                       (10, "root".to_string())],
+        name_map: vec![],
+        rule_name_map: vec![],
+        choose_local_tries: Some(0),
+        choose_local_fallback_tries: Some(0),
+        choose_total_tries: Some(50),
+        chooseleaf_descend_once: Some(1),
+        chooseleaf_vary_r: Some(1),
+        straw_calc_version: Some(0),
+        allowed_bucket_algorithms: Some(54),
+        chooseleaf_stable: Some(1),
+    };
+    set_tunables_jewel(&mut crushmap);
+    assert_eq!(expected, crushmap);
+}
 
 #[test]
 fn test_decode_crushmap() {
