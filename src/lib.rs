@@ -49,29 +49,18 @@ pub fn set_tunables_argonaut(crushmap: &mut CrushMap) -> &mut CrushMap {
 /// Set the crush tunables to Bobtail
 ///
 pub fn set_tunables_bobtail(crushmap: &mut CrushMap) -> &mut CrushMap {
-    let algorithm: u32 = (1 << BucketAlg::Uniform as u32) | (1 << BucketAlg::List as u32) |
-                         (1 << BucketAlg::Straw as u32);
+    set_tunables_argonaut(crushmap);
     crushmap.choose_local_tries = Some(0);
     crushmap.choose_local_fallback_tries = Some(0);
     crushmap.choose_total_tries = Some(50);
     crushmap.chooseleaf_descend_once = Some(1);
-    crushmap.chooseleaf_vary_r = Some(0);
-    crushmap.chooseleaf_stable = Some(0);
-    crushmap.allowed_bucket_algorithms = Some(algorithm);
     crushmap
 }
 /// Set the crush tunables to Firefly
 ///
 pub fn set_tunables_firefly(crushmap: &mut CrushMap) -> &mut CrushMap {
-    let algorithm: u32 = (1 << BucketAlg::Uniform as u32) | (1 << BucketAlg::List as u32) |
-                         (1 << BucketAlg::Straw as u32);
-    crushmap.choose_local_tries = Some(0);
-    crushmap.choose_local_fallback_tries = Some(0);
-    crushmap.choose_total_tries = Some(50);
-    crushmap.chooseleaf_descend_once = Some(1);
+    set_tunables_bobtail(crushmap);
     crushmap.chooseleaf_vary_r = Some(1);
-    crushmap.chooseleaf_stable = Some(0);
-    crushmap.allowed_bucket_algorithms = Some(algorithm);
     crushmap
 }
 /// Set the crush tunables to Hammer
@@ -80,12 +69,7 @@ pub fn set_tunables_hammer(crushmap: &mut CrushMap) -> &mut CrushMap {
     let algorithm: u32 = (1 << BucketAlg::Uniform as u32) | (1 << BucketAlg::List as u32) |
                          (1 << BucketAlg::Straw as u32) |
                          (1 << BucketAlg::Straw2 as u32);
-    crushmap.choose_local_tries = Some(0);
-    crushmap.choose_local_fallback_tries = Some(0);
-    crushmap.choose_total_tries = Some(50);
-    crushmap.chooseleaf_descend_once = Some(1);
-    crushmap.chooseleaf_vary_r = Some(1);
-    crushmap.chooseleaf_stable = Some(0);
+    set_tunables_firefly(crushmap);
     crushmap.allowed_bucket_algorithms = Some(algorithm);
     crushmap
 }
@@ -93,16 +77,8 @@ pub fn set_tunables_hammer(crushmap: &mut CrushMap) -> &mut CrushMap {
 /// Set the crush tunables to Jewel
 ///
 pub fn set_tunables_jewel(crushmap: &mut CrushMap) -> &mut CrushMap {
-    let algorithm: u32 = (1 << BucketAlg::Uniform as u32) | (1 << BucketAlg::List as u32) |
-                         (1 << BucketAlg::Straw as u32) |
-                         (1 << BucketAlg::Straw2 as u32);
-    crushmap.choose_local_tries = Some(0);
-    crushmap.choose_local_fallback_tries = Some(0);
-    crushmap.choose_total_tries = Some(50);
-    crushmap.chooseleaf_descend_once = Some(1);
-    crushmap.chooseleaf_vary_r = Some(1);
+    set_tunables_hammer(crushmap);
     crushmap.chooseleaf_stable = Some(1);
-    crushmap.allowed_bucket_algorithms = Some(algorithm);
     crushmap
 }
 
