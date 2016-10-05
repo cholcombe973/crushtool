@@ -155,7 +155,7 @@ impl From<io::Error> for EncodingError {
 ///
 enum_from_primitive!{
     #[repr(u8)]
-    #[derive(Debug, Clone, Eq, Hash, PartialEq, RustcEncodable)]
+    #[derive(Debug, Clone, Eq, Hash, PartialEq, RustcDecodable, RustcEncodable)]
     pub enum BucketAlg{
         Uniform = 1,
         List = 2,
@@ -167,7 +167,7 @@ enum_from_primitive!{
 
 enum_from_primitive!{
     #[repr(u8)]
-    #[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
+    #[derive(Debug, Clone, Eq, PartialEq, RustcDecodable, RustcEncodable)]
     pub enum RuleType{
         Replicated = 1,
         Raid4 = 2, //NOTE: never implemented
@@ -177,7 +177,7 @@ enum_from_primitive!{
 
 enum_from_primitive!{
     #[repr(u8)]
-    #[derive(Debug, Clone, Eq, Hash, PartialEq, RustcEncodable)]
+    #[derive(Debug, Clone, Eq, Hash, PartialEq, RustcDecodable, RustcEncodable)]
     pub enum CrushHash{
         RJenkins1 = 0,
     }
@@ -186,7 +186,7 @@ enum_from_primitive!{
 // step op codes
 enum_from_primitive!{
     #[repr(u16)]
-    #[derive(Debug, Clone, Eq, Hash, PartialEq, RustcEncodable)]
+    #[derive(Debug, Clone, Eq, Hash, PartialEq, RustcDecodable, RustcEncodable)]
     pub enum OpCode{
         Noop = 0,
         /* arg1 = value to start with*/
@@ -211,7 +211,7 @@ enum_from_primitive!{
 }
 
 /// All items are equally weighted.
-#[derive(Debug, Clone, Eq, Hash, PartialEq, RustcEncodable)]
+#[derive(Debug, Clone, Eq, Hash, PartialEq, RustcEncodable, RustcDecodable)]
 pub struct CrushBucketUniform {
     pub bucket: Bucket,
     /// 16-bit fixed point; all items equally weighted
@@ -242,7 +242,7 @@ impl CrushBucketUniform {
     }
 }
 
-#[derive(Debug, Clone, Eq, Hash, PartialEq, RustcEncodable)]
+#[derive(Debug, Clone, Eq, Hash, PartialEq, RustcDecodable, RustcEncodable)]
 pub struct CrushBucketList {
     pub bucket: Bucket,
     ///  All weights are in 16-bit fixed point
@@ -280,7 +280,7 @@ impl CrushBucketList {
 
 /// CrushBucketTree is generally not used in Ceph because the
 /// algorithm is buggy.
-#[derive(Debug, Clone, Eq, Hash, PartialEq, RustcEncodable)]
+#[derive(Debug, Clone, Eq, Hash, PartialEq, RustcDecodable, RustcEncodable)]
 pub struct CrushBucketTree {
     /// note: h.size is _tree_ size, not number of
     /// actual items
@@ -318,7 +318,7 @@ impl CrushBucketTree {
         Ok(buffer)
     }
 }
-#[derive(Clone, Eq, Hash, PartialEq, RustcEncodable)]
+#[derive(Clone, Eq, Hash, PartialEq, RustcDecodable, RustcEncodable)]
 pub struct CrushBucketStraw2 {
     pub bucket: Bucket,
     ///  All weights are in 16-bit fixed point
@@ -381,7 +381,7 @@ impl fmt::Debug for CrushBucketStraw2 {
     }
 }
 
-#[derive(Clone, Eq, Hash, PartialEq, RustcEncodable)]
+#[derive(Clone, Eq, Hash, PartialEq, RustcDecodable, RustcEncodable)]
 pub struct CrushBucketStraw {
     pub bucket: Bucket,
     ///  All weights are in 16-bit fixed point
@@ -449,7 +449,7 @@ impl fmt::Debug for CrushBucketStraw {
 }
 
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq, RustcEncodable)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, RustcDecodable, RustcEncodable)]
 pub enum BucketTypes {
     Uniform(CrushBucketUniform),
     List(CrushBucketList),
@@ -620,7 +620,7 @@ fn parse_bucket<'a>(input: &'a [u8]) -> nom::IResult<&[u8], BucketTypes> {
     }
 }
 
-#[derive(Debug, Clone, Eq, Hash, PartialEq, RustcEncodable)]
+#[derive(Debug, Clone, Eq, Hash, PartialEq, RustcDecodable, RustcEncodable)]
 pub struct Bucket {
     /// this'll be negative
     pub id: i32,
@@ -720,7 +720,7 @@ impl Bucket {
 /// mapped to devices.  A rule consists of sequence of steps to perform
 /// to generate the set of output devices.
 ///
-#[derive(Clone, Eq, PartialEq, RustcEncodable)]
+#[derive(Clone, Eq, PartialEq, RustcDecodable, RustcEncodable)]
 pub struct CrushRuleStep {
     pub op: OpCode,
     pub arg1: (i32, Option<String>),
@@ -788,7 +788,7 @@ impl fmt::Debug for CrushRuleStep {
 /// Given a ruleset and size of output set, we search through the
 /// rule list for a matching rule_mask.
 ///
-#[derive(Clone, Eq, PartialEq, RustcEncodable)]
+#[derive(Clone, Eq, PartialEq, RustcDecodable, RustcEncodable)]
 pub struct CrushRuleMask {
     pub ruleset: u8,
     pub rule_type: RuleType,
@@ -844,7 +844,7 @@ impl fmt::Debug for CrushRuleMask {
 }
 
 
-#[derive(Debug, Clone, Eq, PartialEq, RustcEncodable)]
+#[derive(Debug, Clone, Eq, PartialEq, RustcDecodable, RustcEncodable)]
 pub struct Rule {
     pub mask: CrushRuleMask,
     pub steps: Vec<CrushRuleStep>,
@@ -945,7 +945,7 @@ fn update_buckets<'a>(crush_buckets: &'a mut Vec<BucketTypes>,
 }
 
 /// CrushMap includes all buckets, rules, etc.
-#[derive(Clone, Eq, PartialEq, RustcEncodable)]
+#[derive(Clone, Eq, PartialEq, RustcDecodable, RustcEncodable)]
 pub struct CrushMap {
     pub magic: u32,
     pub max_buckets: i32,
