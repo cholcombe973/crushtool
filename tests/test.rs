@@ -2,11 +2,11 @@ extern crate nom;
 extern crate crushtool;
 use crushtool::{CrushMap, BucketTypes, CrushBucketStraw, CrushBucketStraw2, OpCode, BucketAlg,
                 CrushRuleStep, Bucket, CrushRuleMask, CrushHash, Rule, RuleType, decode_crushmap,
-                encode_crushmap, set_tunables_jewel};
+                encode_crushmap, set_tunables_jewel, set_tunables_argonaut, set_tunables_bobtail,
+                set_tunables_firefly, set_tunables_hammer};
 
-#[test]
-fn it_sets_tunables_correctly() {
-    let mut crushmap = CrushMap {
+fn get_crushmap() -> CrushMap {
+    CrushMap {
         magic: 65536,
         max_buckets: 8,
         max_rules: 1,
@@ -33,8 +33,157 @@ fn it_sets_tunables_correctly() {
         chooseleaf_vary_r: Some(0),
         straw_calc_version: Some(0),
         allowed_bucket_algorithms: Some(0),
+        chooseleaf_stable: Some(1),
+    }
+}
+
+#[test]
+fn it_sets_tunables_for_argonaut() {
+    let mut crushmap = get_crushmap();
+    let expected = CrushMap {
+        magic: 65536,
+        max_buckets: 8,
+        max_rules: 1,
+        max_devices: 3,
+        buckets: vec![],
+        rules: vec![],
+        type_map: vec![(0, "osd".to_string()),
+                       (1, "host".to_string()),
+                       (2, "chassis".to_string()),
+                       (3, "rack".to_string()),
+                       (4, "row".to_string()),
+                       (5, "pdu".to_string()),
+                       (6, "pod".to_string()),
+                       (7, "room".to_string()),
+                       (8, "datacenter".to_string()),
+                       (9, "region".to_string()),
+                       (10, "root".to_string())],
+        name_map: vec![],
+        rule_name_map: vec![],
+        choose_local_tries: Some(2),
+        choose_local_fallback_tries: Some(5),
+        choose_total_tries: Some(19),
+        chooseleaf_descend_once: Some(0),
+        chooseleaf_vary_r: Some(0),
+        straw_calc_version: Some(0),
+        allowed_bucket_algorithms: Some(22),
         chooseleaf_stable: Some(0),
     };
+    set_tunables_argonaut(&mut crushmap);
+    assert_eq!(expected, crushmap);
+}
+
+#[test]
+fn it_sets_tunables_for_bobtail() {
+    let mut crushmap = get_crushmap();
+    let expected = CrushMap {
+        magic: 65536,
+        max_buckets: 8,
+        max_rules: 1,
+        max_devices: 3,
+        buckets: vec![],
+        rules: vec![],
+        type_map: vec![(0, "osd".to_string()),
+                       (1, "host".to_string()),
+                       (2, "chassis".to_string()),
+                       (3, "rack".to_string()),
+                       (4, "row".to_string()),
+                       (5, "pdu".to_string()),
+                       (6, "pod".to_string()),
+                       (7, "room".to_string()),
+                       (8, "datacenter".to_string()),
+                       (9, "region".to_string()),
+                       (10, "root".to_string())],
+        name_map: vec![],
+        rule_name_map: vec![],
+        choose_local_tries: Some(0),
+        choose_local_fallback_tries: Some(0),
+        choose_total_tries: Some(50),
+        chooseleaf_descend_once: Some(1),
+        chooseleaf_vary_r: Some(0),
+        straw_calc_version: Some(0),
+        allowed_bucket_algorithms: Some(22),
+        chooseleaf_stable: Some(0),
+    };
+    set_tunables_bobtail(&mut crushmap);
+    assert_eq!(expected, crushmap);
+}
+
+#[test]
+fn it_sets_tunables_for_firefly() {
+    let mut crushmap = get_crushmap();
+    let expected = CrushMap {
+        magic: 65536,
+        max_buckets: 8,
+        max_rules: 1,
+        max_devices: 3,
+        buckets: vec![],
+        rules: vec![],
+        type_map: vec![(0, "osd".to_string()),
+                       (1, "host".to_string()),
+                       (2, "chassis".to_string()),
+                       (3, "rack".to_string()),
+                       (4, "row".to_string()),
+                       (5, "pdu".to_string()),
+                       (6, "pod".to_string()),
+                       (7, "room".to_string()),
+                       (8, "datacenter".to_string()),
+                       (9, "region".to_string()),
+                       (10, "root".to_string())],
+        name_map: vec![],
+        rule_name_map: vec![],
+        choose_local_tries: Some(0),
+        choose_local_fallback_tries: Some(0),
+        choose_total_tries: Some(50),
+        chooseleaf_descend_once: Some(1),
+        chooseleaf_vary_r: Some(1),
+        straw_calc_version: Some(0),
+        allowed_bucket_algorithms: Some(22),
+        chooseleaf_stable: Some(0),
+    };
+    set_tunables_firefly(&mut crushmap);
+    assert_eq!(expected, crushmap);
+}
+
+#[test]
+fn it_sets_tunables_for_hammer() {
+    let mut crushmap = get_crushmap();
+    let expected = CrushMap {
+        magic: 65536,
+        max_buckets: 8,
+        max_rules: 1,
+        max_devices: 3,
+        buckets: vec![],
+        rules: vec![],
+        type_map: vec![(0, "osd".to_string()),
+                       (1, "host".to_string()),
+                       (2, "chassis".to_string()),
+                       (3, "rack".to_string()),
+                       (4, "row".to_string()),
+                       (5, "pdu".to_string()),
+                       (6, "pod".to_string()),
+                       (7, "room".to_string()),
+                       (8, "datacenter".to_string()),
+                       (9, "region".to_string()),
+                       (10, "root".to_string())],
+        name_map: vec![],
+        rule_name_map: vec![],
+        choose_local_tries: Some(0),
+        choose_local_fallback_tries: Some(0),
+        choose_total_tries: Some(50),
+        chooseleaf_descend_once: Some(1),
+        chooseleaf_vary_r: Some(1),
+        straw_calc_version: Some(0),
+        allowed_bucket_algorithms: Some(54),
+        chooseleaf_stable: Some(0),
+    };
+    set_tunables_hammer(&mut crushmap);
+    assert_eq!(expected, crushmap);
+}
+
+#[test]
+fn it_sets_tunables_for_jewel() {
+    let mut crushmap = get_crushmap();
     let expected = CrushMap {
         magic: 65536,
         max_buckets: 8,
