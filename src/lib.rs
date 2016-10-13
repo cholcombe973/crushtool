@@ -219,6 +219,30 @@ pub enum BucketTypes {
     Unknown,
 }
 
+impl BucketTypes {
+    pub fn bucket(&self) -> Option<&Bucket> {
+        match *self {
+            BucketTypes::Unknown => None,
+            BucketTypes::Uniform(ref b) => Some(&b.bucket),
+            BucketTypes::List(ref b) => Some(&b.bucket),
+            BucketTypes::Tree(ref b) => Some(&b.bucket),
+            BucketTypes::Straw(ref b) => Some(&b.bucket),
+            BucketTypes::Straw2(ref b) => Some(&b.bucket),
+        }
+    }
+
+    pub fn id(&self) -> i32 {
+        match *self {
+            BucketTypes::Unknown => 65536,
+            BucketTypes::Uniform(ref b) => b.bucket.id,
+            BucketTypes::List(ref b) => b.bucket.id,
+            BucketTypes::Tree(ref b) => b.bucket.id,
+            BucketTypes::Straw(ref b) => b.bucket.id,
+            BucketTypes::Straw2(ref b) => b.bucket.id,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Eq, Hash, PartialEq, RustcDecodable, RustcEncodable)]
 pub struct Bucket {
     /// this'll be negative
