@@ -391,4 +391,49 @@ impl Default for CrushMap {
         }
     }
 }
+#[derive(Clone, Debug, Eq, PartialEq, RustcDecodable, RustcEncodable)]
+pub struct CephDisk {
+    pub name: Option<String>,
+    pub uuid: Option<Uuid>,
+}
 
+#[derive(Clone, Debug, Eq, PartialEq, RustcDecodable, RustcEncodable)]
+pub struct CephHost {
+    pub hostname: Option<String>,
+    pub disks: Vec<CephDisk>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, RustcDecodable, RustcEncodable)]
+pub enum CephBucketType {
+    Bucket(CephBucket),
+    Host(CephHost),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, RustcDecodable, RustcEncodable)]
+pub struct CephBucket {
+    pub name: String,
+    pub buckets: Vec<CephBucketType>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, RustcDecodable, RustcEncodable)]
+pub struct CephCrushMap {
+    // pub hosts: Vec<CephHost>,
+    // pub disks: Vec<CephDisk>,
+    pub failure_domain: String,
+    pub buckets: Vec<CephBucket>,
+    pub pools: Vec<CephPool>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, RustcDecodable, RustcEncodable)]
+pub struct CephPool {
+    pub disks: Vec<CephDisk>,
+    pub name: String,
+    pub pool_type: RuleType,
+}
+
+impl CephCrushMap {
+    pub fn to_crushmap(self) -> CrushMap {
+        let mut crushmap = CrushMap::default();
+        crushmap
+    }
+}
