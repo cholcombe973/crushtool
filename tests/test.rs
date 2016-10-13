@@ -218,6 +218,12 @@ fn it_sets_tunables_for_jewel() {
 }
 
 #[test]
+fn it_gets_next_id_correctly() {
+    let crushmap = CrushMap::default();
+    assert_eq!(crushmap.next_bucket_id(), -1);
+}
+
+#[test]
 fn test_decode_crushmap() {
     let crushmap_compiled: &[u8] =
         &[0x00, 0x00, 0x01, 0x00, 0x08, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x03, 0x00,
