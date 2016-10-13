@@ -90,6 +90,15 @@ pub enum EncodingError {
     FromUtf8Error(FromUtf8Error),
 }
 
+#[derive(Debug)]
+pub enum CephVersion {
+    Argonaut,
+    Bobtail,
+    Firefly,
+    Hammer,
+    Jewel,
+}
+
 /// A bucket is a named container of other items (either devices or
 /// other buckets).  Items within a bucket are chosen using one of a
 /// few different algorithms.  The table summarizes how the speed of
@@ -310,3 +319,52 @@ pub struct CrushMap {
     /// device fails.
     pub chooseleaf_stable: Option<u8>,
 }
+
+impl CrushMap {
+    pub fn with_tunables(mut self, version: CephVersion) -> Self {
+        match version {
+            CephVersion::Argonaut => set_tunables_argonaut(&mut self),
+            CephVersion::Bobtail => set_tunables_bobtail(&mut self),
+            CephVersion::Firefly => set_tunables_firefly(&mut self),
+            CephVersion::Hammer => set_tunables_hammer(&mut self),
+            CephVersion::Jewel => set_tunables_jewel(&mut self),
+        };
+        self
+    }
+
+}
+
+impl Default for CrushMap {
+    fn default() -> CrushMap {
+        CrushMap {
+            magic: 65536,
+            max_buckets: 0,
+            max_rules: 0,
+            max_devices: 0,
+            buckets: vec![],
+            rules: vec![],
+            type_map: vec![(0, "osd".to_string()),
+                           (1, "host".to_string()),
+                           (2, "chassis".to_string()),
+                           (3, "rack".to_string()),
+                           (4, "row".to_string()),
+                           (5, "pdu".to_string()),
+                           (6, "pod".to_string()),
+                           (7, "room".to_string()),
+                           (8, "datacenter".to_string()),
+                           (9, "region".to_string()),
+                           (10, "root".to_string())],
+            name_map: vec![],
+            rule_name_map: vec![],
+            choose_local_tries: Some(2),
+            choose_local_fallback_tries: Some(15),
+            choose_total_tries: Some(19),
+            chooseleaf_descend_once: Some(0),
+            chooseleaf_vary_r: Some(0),
+            straw_calc_version: Some(0),
+            allowed_bucket_algorithms: Some(0),
+            chooseleaf_stable: Some(22),
+        }
+    }
+}
+
