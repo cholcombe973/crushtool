@@ -14,4 +14,4 @@ clap = "~2.2"
 nom = "~1.2"
 num = "~0.1"
 rustc-serialize = "~0.3"
-
+uuid = { version = "0.2", features = ["rustc-serialize"] }

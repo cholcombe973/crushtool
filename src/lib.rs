@@ -19,9 +19,12 @@ extern crate log;
 extern crate nom;
 extern crate num;
 extern crate rustc_serialize;
+extern crate uuid;
 
 use std::io as std_io;
 use std::string::FromUtf8Error;
+
+use uuid::Uuid;
 
 // use rustc_serialize::json;
 
