@@ -68,7 +68,7 @@ fn main() {
             io::stdin().read_to_end(&mut buffer).unwrap();
 
             let crushmap = decode_crushmap(&buffer)
-                .expect("Could not decode the prodived crushmap");
+                .expect("Could not decode the provided crushmap");
             println!("{}", json::encode(&crushmap).unwrap());
         }
     }
