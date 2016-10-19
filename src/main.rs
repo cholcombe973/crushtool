@@ -42,17 +42,16 @@ fn main() {
         .arg(Arg::with_name("output")
             .short("o")
             .help("Output file to put compiled crushmap into")
-            .required(true)
             .takes_value(true))
         .get_matches();
 
-
+    // This unwrap is safe because the required is true
     let mode = value_t!(matches.value_of("mode"), Mode).unwrap();
 
     match mode {
         Mode::compile => {
             let mut input = String::new();
-            io::stdin().read_to_string(&mut input).unwrap();
+            io::stdin().read_to_string(&mut input).expect("We couldn't read from STDIN");
             input = input.trim_right().into();
 
             let input_map: CrushMap = if matches.is_present("custom") {
@@ -60,16 +59,16 @@ fn main() {
             } else {
                 json::decode(&input).expect("The provided crushmap JSON could not be understood")
             };
-            write_to_file(matches.value_of("output").unwrap(), input_map)
+            write_to_file(matches.value_of("output").unwrap_or("crushmap"), input_map)
                 .expect("Failed to write the crushmap to the file")
         }
         Mode::decompile => {
             let mut buffer = Vec::new();
-            io::stdin().read_to_end(&mut buffer).unwrap();
-
+            io::stdin().read_to_end(&mut buffer).expect("Couldn't read from STDIN");
             let crushmap = decode_crushmap(&buffer)
                 .expect("Could not decode the provided crushmap");
-            println!("{}", json::encode(&crushmap).unwrap());
+            println!("{}",
+                     json::encode(&crushmap).expect("Couldn't encode the crushap as JSON"));
         }
     }
 
