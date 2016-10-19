@@ -356,6 +356,21 @@ impl CrushMap {
         self
     }
 
+    #[inline]
+    pub fn next_bucket_id(&self) -> i32 {
+        self.buckets
+            .iter()
+            .map(|b| b.bucket())
+            .filter(|b| b.is_some())
+            .map(|b| b.unwrap().id)
+            .min()
+            .unwrap_or(0) - 1
+    }
+
+    pub fn add_bucket(mut self, bucket_type: BucketTypes) -> Self {
+        self.buckets.push(bucket_type);
+        self
+    }
 }
 
 impl Default for CrushMap {
