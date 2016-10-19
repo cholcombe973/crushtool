@@ -1,0 +1,279 @@
+{
+    "magic": 65536,
+    "max_buckets": 8,
+    "max_rules": 1,
+    "max_devices": 3,
+    "buckets": [
+        {
+            "variant": "Straw",
+            "fields": [
+                {
+                    "bucket": {
+                        "id": -1,
+                        "bucket_type": "SetChooseLocalTries",
+                        "alg": "Straw",
+                        "hash": "RJenkins1",
+                        "weight": 0,
+                        "size": 3,
+                        "items": [
+                            [
+                                -2,
+                                "ip-172-31-43-147"
+                            ],
+                            [
+                                -3,
+                                "ip-172-31-22-2"
+                            ],
+                            [
+                                -4,
+                                "ip-172-31-4-56"
+                            ]
+                        ],
+                        "perm_n": 0,
+                        "perm": 3
+                    },
+                    "item_weights": [
+                        [
+                            0,
+                            0
+                        ],
+                        [
+                            0,
+                            0
+                        ],
+                        [
+                            0,
+                            0
+                        ]
+                    ]
+                }
+            ]
+        },
+        {
+            "variant": "Straw",
+            "fields": [
+                {
+                    "bucket": {
+                        "id": -2,
+                        "bucket_type": "Take",
+                        "alg": "Straw",
+                        "hash": "RJenkins1",
+                        "weight": 0,
+                        "size": 1,
+                        "items": [
+                            [
+                                0,
+                                "osd.0"
+                            ]
+                        ],
+                        "perm_n": 0,
+                        "perm": 1
+                    },
+                    "item_weights": [
+                        [
+                            0,
+                            0
+                        ]
+                    ]
+                }
+            ]
+        },
+        {
+            "variant": "Straw",
+            "fields": [
+                {
+                    "bucket": {
+                        "id": -3,
+                        "bucket_type": "Take",
+                        "alg": "Straw",
+                        "hash": "RJenkins1",
+                        "weight": 0,
+                        "size": 1,
+                        "items": [
+                            [
+                                1,
+                                "osd.1"
+                            ]
+                        ],
+                        "perm_n": 0,
+                        "perm": 1
+                    },
+                    "item_weights": [
+                        [
+                            0,
+                            0
+                        ]
+                    ]
+                }
+            ]
+        },
+        {
+            "variant": "Straw",
+            "fields": [
+                {
+                    "bucket": {
+                        "id": -4,
+                        "bucket_type": "Take",
+                        "alg": "Straw",
+                        "hash": "RJenkins1",
+                        "weight": 0,
+                        "size": 1,
+                        "items": [
+                            [
+                                2,
+                                "osd.2"
+                            ]
+                        ],
+                        "perm_n": 0,
+                        "perm": 1
+                    },
+                    "item_weights": [
+                        [
+                            0,
+                            0
+                        ]
+                    ]
+                }
+            ]
+        },
+        "Unknown",
+        "Unknown",
+        "Unknown",
+        "Unknown"
+    ],
+    "rules": [
+        {
+            "mask": {
+                "ruleset": 0,
+                "rule_type": "Replicated",
+                "min_size": 1,
+                "max_size": 10
+            },
+            "steps": [
+                {
+                    "op": "Take",
+                    "arg1": [
+                        -1,
+                        null
+                    ],
+                    "arg2": [
+                        0,
+                        "osd"
+                    ]
+                },
+                {
+                    "op": "ChooseLeafFirstN",
+                    "arg1": [
+                        0,
+                        "osd"
+                    ],
+                    "arg2": [
+                        1,
+                        "host"
+                    ]
+                },
+                {
+                    "op": "Emit",
+                    "arg1": [
+                        0,
+                        "osd"
+                    ],
+                    "arg2": [
+                        0,
+                        "osd"
+                    ]
+                }
+            ]
+        }
+    ],
+    "type_map": [
+        [
+            0,
+            "osd"
+        ],
+        [
+            1,
+            "host"
+        ],
+        [
+            2,
+            "chassis"
+        ],
+        [
+            3,
+            "rack"
+        ],
+        [
+            4,
+            "row"
+        ],
+        [
+            5,
+            "pdu"
+        ],
+        [
+            6,
+            "pod"
+        ],
+        [
+            7,
+            "room"
+        ],
+        [
+            8,
+            "datacenter"
+        ],
+        [
+            9,
+            "region"
+        ],
+        [
+            10,
+            "root"
+        ]
+    ],
+    "name_map": [
+        [
+            -4,
+            "ip-172-31-4-56"
+        ],
+        [
+            -3,
+            "ip-172-31-22-2"
+        ],
+        [
+            -2,
+            "ip-172-31-43-147"
+        ],
+        [
+            -1,
+            "default"
+        ],
+        [
+            0,
+            "osd.0"
+        ],
+        [
+            1,
+            "osd.1"
+        ],
+        [
+            2,
+            "osd.2"
+        ]
+    ],
+    "rule_name_map": [
+        [
+            0,
+            "replicated_ruleset"
+        ]
+    ],
+    "choose_local_tries": 0,
+    "choose_local_fallback_tries": 0,
+    "choose_total_tries": 50,
+    "chooseleaf_descend_once": 1,
+    "chooseleaf_vary_r": 1,
+    "straw_calc_version": 0,
+    "allowed_bucket_algorithms": 54,
+    "chooseleaf_stable": 1
+}
