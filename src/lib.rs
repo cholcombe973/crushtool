@@ -19,9 +19,12 @@ extern crate log;
 extern crate nom;
 extern crate num;
 extern crate rustc_serialize;
+extern crate uuid;
 
 use std::io as std_io;
 use std::string::FromUtf8Error;
+
+use uuid::Uuid;
 
 // use rustc_serialize::json;
 
@@ -85,6 +88,15 @@ pub enum EncodingError {
     InvalidValue,
     InvalidType,
     FromUtf8Error(FromUtf8Error),
+}
+
+#[derive(Debug)]
+pub enum CephVersion {
+    Argonaut,
+    Bobtail,
+    Firefly,
+    Hammer,
+    Jewel,
 }
 
 /// A bucket is a named container of other items (either devices or
@@ -207,6 +219,30 @@ pub enum BucketTypes {
     Unknown,
 }
 
+impl BucketTypes {
+    pub fn bucket(&self) -> Option<&Bucket> {
+        match *self {
+            BucketTypes::Unknown => None,
+            BucketTypes::Uniform(ref b) => Some(&b.bucket),
+            BucketTypes::List(ref b) => Some(&b.bucket),
+            BucketTypes::Tree(ref b) => Some(&b.bucket),
+            BucketTypes::Straw(ref b) => Some(&b.bucket),
+            BucketTypes::Straw2(ref b) => Some(&b.bucket),
+        }
+    }
+
+    pub fn id(&self) -> i32 {
+        match *self {
+            BucketTypes::Unknown => 65536,
+            BucketTypes::Uniform(ref b) => b.bucket.id,
+            BucketTypes::List(ref b) => b.bucket.id,
+            BucketTypes::Tree(ref b) => b.bucket.id,
+            BucketTypes::Straw(ref b) => b.bucket.id,
+            BucketTypes::Straw2(ref b) => b.bucket.id,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Eq, Hash, PartialEq, RustcDecodable, RustcEncodable)]
 pub struct Bucket {
     /// this'll be negative
@@ -306,4 +342,113 @@ pub struct CrushMap {
     /// no local retry) so that data migrations would be optimal when some
     /// device fails.
     pub chooseleaf_stable: Option<u8>,
+}
+
+impl CrushMap {
+    pub fn with_tunables(mut self, version: CephVersion) -> Self {
+        match version {
+            CephVersion::Argonaut => set_tunables_argonaut(&mut self),
+            CephVersion::Bobtail => set_tunables_bobtail(&mut self),
+            CephVersion::Firefly => set_tunables_firefly(&mut self),
+            CephVersion::Hammer => set_tunables_hammer(&mut self),
+            CephVersion::Jewel => set_tunables_jewel(&mut self),
+        };
+        self
+    }
+
+    #[inline]
+    pub fn next_bucket_id(&self) -> i32 {
+        self.buckets
+            .iter()
+            .map(|b| b.bucket())
+            .filter(|b| b.is_some())
+            .map(|b| b.unwrap().id)
+            .min()
+            .unwrap_or(0) - 1
+    }
+
+    pub fn add_bucket(mut self, bucket_type: BucketTypes) -> Self {
+        self.buckets.push(bucket_type);
+        self
+    }
+}
+
+impl Default for CrushMap {
+    fn default() -> CrushMap {
+        CrushMap {
+            magic: 65536,
+            max_buckets: 0,
+            max_rules: 0,
+            max_devices: 0,
+            buckets: vec![],
+            rules: vec![],
+            type_map: vec![(0, "osd".to_string()),
+                           (1, "host".to_string()),
+                           (2, "chassis".to_string()),
+                           (3, "rack".to_string()),
+                           (4, "row".to_string()),
+                           (5, "pdu".to_string()),
+                           (6, "pod".to_string()),
+                           (7, "room".to_string()),
+                           (8, "datacenter".to_string()),
+                           (9, "region".to_string()),
+                           (10, "root".to_string())],
+            name_map: vec![],
+            rule_name_map: vec![],
+            choose_local_tries: Some(2),
+            choose_local_fallback_tries: Some(15),
+            choose_total_tries: Some(19),
+            chooseleaf_descend_once: Some(0),
+            chooseleaf_vary_r: Some(0),
+            straw_calc_version: Some(0),
+            allowed_bucket_algorithms: Some(0),
+            chooseleaf_stable: Some(22),
+        }
+    }
+}
+#[derive(Clone, Debug, Eq, PartialEq, RustcDecodable, RustcEncodable)]
+pub struct CephDisk {
+    pub name: Option<String>,
+    pub uuid: Option<Uuid>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, RustcDecodable, RustcEncodable)]
+pub struct CephHost {
+    pub hostname: Option<String>,
+    pub disks: Vec<CephDisk>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, RustcDecodable, RustcEncodable)]
+pub enum CephBucketType {
+    Bucket(CephBucket),
+    Host(CephHost),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, RustcDecodable, RustcEncodable)]
+pub struct CephBucket {
+    pub name: String,
+    pub buckets: Vec<CephBucketType>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, RustcDecodable, RustcEncodable)]
+pub struct CephCrushMap {
+    // pub hosts: Vec<CephHost>,
+    // pub disks: Vec<CephDisk>,
+    pub failure_domain: String,
+    pub buckets: Vec<CephBucket>,
+    pub pools: Vec<CephPool>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, RustcDecodable, RustcEncodable)]
+pub struct CephPool {
+    pub disks: Vec<CephDisk>,
+    pub name: String,
+    pub pool_type: RuleType,
+}
+
+impl CephCrushMap {
+    pub fn to_crushmap(self) -> CrushMap {
+        let mut crushmap = CrushMap::default();
+        crushmap
+    }
 }
